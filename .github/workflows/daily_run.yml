@@ -41,6 +41,12 @@ jobs:
         run: |
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Move branch pointer to latest origin/main without touching generated files,
+          # so the commit lands on top of any pushes made since checkout — no rebase needed.
+          git fetch origin main
+          git reset --soft origin/main
+
           git add data/daily_log.csv   \
                   data/option_price.csv \
                   data/position.json    \
@@ -48,5 +54,4 @@ jobs:
                   dashboard/index.html
           git diff --staged --quiet && echo "Nothing changed" || \
             git commit -m "Daily update $(date -u +'%Y-%m-%d')"
-          git pull --rebase -X ours origin main
-          git push
+          git push origin main
