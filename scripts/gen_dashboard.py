@@ -301,25 +301,24 @@ def _gen_status_out(signal_info, today_str, fetched=None):
     signal_class = 'c-buy' if signal == 'BUY' else 'c-hold'
     signal_color = 'green' if signal == 'BUY' else 'orange'
     alert_class  = 'alert-warn' if signal == 'BUY' else 'alert-ok'
+    display_signal = signal if signal == 'BUY' else 'WAIT'
 
     # Today's market data from fetched.json (if available)
-    curr_vix  = float(fetched.get('vix', 0)) if fetched else 0
-    curr_ask  = float(fetched.get('option_ask', 0)) if fetched else 0
-    curr_bid  = float(fetched.get('option_bid', 0)) if fetched else 0
-    hyp_strike = int(fetched.get('strike', 0)) if fetched else 0
-    sigma     = float(fetched.get('sigma', SIGMA0)) if fetched else SIGMA0
+    curr_vix   = float(fetched.get('vix', 0))        if fetched else 0
+    curr_ask   = float(fetched.get('option_ask', 0)) if fetched else 0
+    hyp_strike = int(fetched.get('strike', 0))        if fetched else 0
 
     if signal == 'BUY':
         alert_txt = (f'BUY SIGNAL — Agent recommends entering today. '
                      f'Hypothetical entry: VIX {curr_vix:.2f}, ask ${curr_ask:.2f}, '
                      f'strike {hyp_strike}.')
     else:
-        vix_str = f' VIX: {curr_vix:.2f}.' if curr_vix > 0 else ''
+        vix_str = f'  Current VIX: {curr_vix:.2f}.' if curr_vix > 0 else ''
         alert_txt = f'Waiting for entry signal — no position open.{vix_str}'
 
-    vix_card  = f'{curr_vix:.2f}' if curr_vix > 0 else '—'
-    ask_card  = f'${curr_ask:.2f}' if curr_ask > 0 else '—'
-    ask_hint  = f'Strike {hyp_strike} Call (hypothetical)' if hyp_strike > 0 else 'No position'
+    vix_card = f'{curr_vix:.2f}' if curr_vix > 0 else '—'
+    ask_card = f'${curr_ask:.2f}' if curr_ask > 0 else '—'
+    ask_hint = f'Strike {hyp_strike} Call (if entered today)' if hyp_strike > 0 else 'No position'
 
     return f'''<!-- STATUS CARDS -->
 <div class="sec">Today's Status ({today_str})</div>
@@ -330,17 +329,17 @@ def _gen_status_out(signal_info, today_str, fetched=None):
     <div class="hint">No open trade</div>
   </div>
   <div class="card {signal_class}">
-    <div class="lbl">Entry Signal</div>
-    <div class="val {signal_color}">{signal}</div>
+    <div class="lbl">Recommendation</div>
+    <div class="val {signal_color}">{display_signal}</div>
     <div class="hint">—</div>
   </div>
   <div class="card">
-    <div class="lbl">VIX Today</div>
+    <div class="lbl">VIX Close</div>
     <div class="val white">{vix_card}</div>
     <div class="hint">EOD close</div>
   </div>
   <div class="card">
-    <div class="lbl">Option Ask (entry cost)</div>
+    <div class="lbl">Option Ask (if entered today)</div>
     <div class="val white">{ask_card}</div>
     <div class="hint">{ask_hint}</div>
   </div>
@@ -404,31 +403,45 @@ const histVIX=[
 ];'''
 
 
-def gen_trades_js(trades):
+def gen_trades_js(trades, daily_log=None):
     """Generate the JS trades array (reverse-chronological, newest first)."""
-    # Sort newest first
-    def sort_key(t):
-        return t['entry_date']
-    sorted_trades = sorted(trades, key=sort_key, reverse=True)
+    sorted_trades = sorted(trades, key=lambda t: t['entry_date'], reverse=True)
+
+    # Current live state for any OPEN trade
+    curr_days = int(daily_log[-1]['days_held']) if daily_log else 0
+    curr_roi  = float(daily_log[-1]['roi_bid'])  if daily_log else 0.0
+    curr_vix  = float(daily_log[-1]['vix'])       if daily_log else 0.0
 
     items = []
     for i, t in enumerate(sorted_trades):
-        n        = len(sorted_trades) - i
-        entry    = t['entry_date']
-        evix     = float(t['entry_vix'])
-        strike   = int(t['strike'])
-        is_open  = t['exit_reason'] == 'OPEN'
-        exit_d   = t['exit_date'] if t['exit_date'] else '—'
-        exvix    = float(t['exit_vix']) if t['exit_vix'] else 'null'
-        days     = int(t['days_held']) if t['days_held'] else 0
-        roi_bid  = float(t['roi_bid']) if t['roi_bid'] else 0.0
-        rsn      = t['exit_reason'] if t['exit_reason'] else 'AE'
-        note     = t.get('note', '').replace("'", "\\'")
+        n       = len(sorted_trades) - i
+        entry   = t['entry_date']
+        evix    = float(t['entry_vix'])
+        strike  = int(t['strike'])
+        is_open = t['exit_reason'] == 'OPEN'
+        rsn     = t['exit_reason'] if t['exit_reason'] else 'AE'
+        note    = t.get('note', '').replace("'", "\\'")
+
+        if is_open:
+            # Fill in live current state from daily_log
+            exit_d  = 'OPEN'
+            exvix   = curr_vix if curr_vix > 0 else 'null'
+            days    = curr_days
+            roi_bid = curr_roi
+        else:
+            exit_d  = t['exit_date'] if t['exit_date'] else '—'
+            exvix   = float(t['exit_vix']) if t['exit_vix'] else 'null'
+            days    = int(t['days_held']) if t['days_held'] else 0
+            roi_bid = float(t['roi_bid']) if t['roi_bid'] else 0.0
+
         items.append(
             f"  {{n:{n},entry:'{entry}',evix:{evix},strike:{strike},"
             f"exit:'{exit_d}',exvix:{exvix},days:{days},"
             f"roi:{roi_bid},roiBid:{roi_bid},rsn:'{rsn}',note:'{note}'}}"
         )
+
+    if not items:
+        return 'const trades=[];'
     return 'const trades=[\n' + ',\n'.join(items) + '\n];'
 
 
@@ -498,7 +511,7 @@ def main(is_mock=False):
     html = replace_sentinel(html, 'STATUS',      gen_status(position, daily_log, signal_info, today_str, fetched))
     html = replace_sentinel(html, 'PERF',        gen_perf(perf))
     html = replace_sentinel(html, 'JSDATA',      gen_jsdata(position, daily_log, fetched))
-    html = replace_sentinel(html, 'TRADES',      gen_trades_js(trades))
+    html = replace_sentinel(html, 'TRADES',      gen_trades_js(trades, daily_log))
 
     OUT_PATH.write_text(html, encoding='utf-8')
     print(f'Dashboard written -> {OUT_PATH}  ({len(html):,} bytes)')

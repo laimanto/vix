@@ -97,7 +97,7 @@ tr:hover td { background: #1c2128; }
 <body>
 
 <!-- %%BANNER_START%% -->
-<div class="mock-banner">⚠ MOCK DATA — Design Reference Only — Not Live Production Data</div>
+<div style="background:#0c2d12;color:#3fb950;text-align:center;padding:7px;font-weight:700;font-size:12px;letter-spacing:1px;">● LIVE — Data sourced from yfinance EOD</div>
 <!-- %%BANNER_END%% -->
 
 <header>
@@ -127,17 +127,17 @@ tr:hover td { background: #1c2128; }
     <div class="hint">No open trade</div>
   </div>
   <div class="card c-hold">
-    <div class="lbl">Entry Signal</div>
-    <div class="val orange">HOLD</div>
+    <div class="lbl">Recommendation</div>
+    <div class="val orange">WAIT</div>
     <div class="hint">—</div>
   </div>
   <div class="card">
-    <div class="lbl">VIX Today</div>
+    <div class="lbl">VIX Close</div>
     <div class="val white">—</div>
     <div class="hint">EOD close</div>
   </div>
   <div class="card">
-    <div class="lbl">Option Ask (entry cost)</div>
+    <div class="lbl">Option Ask (if entered today)</div>
     <div class="val white">—</div>
     <div class="hint">No position</div>
   </div>
@@ -222,12 +222,12 @@ tr:hover td { background: #1c2128; }
 <div class="sec">Agent Performance — Closed Trades (from trades.csv)</div>
 <!-- %%PERF_START%% -->
 <div class="perf-row">
-  <div class="perf-cell"><div class="lbl">Closed Trades</div><div class="val white">12</div></div>
-  <div class="perf-cell"><div class="lbl">Win Rate</div><div class="val green">58.3%</div></div>
-  <div class="perf-cell"><div class="lbl">Avg ROI / Trade</div><div class="val green">+36.6%</div></div>
-  <div class="perf-cell"><div class="lbl">Total ROI</div><div class="val green">+439%</div></div>
+  <div class="perf-cell"><div class="lbl">Closed Trades</div><div class="val white">0</div></div>
+  <div class="perf-cell"><div class="lbl">Win Rate</div><div class="val green">0.0%</div></div>
+  <div class="perf-cell"><div class="lbl">Avg ROI / Trade</div><div class="val green">+0%</div></div>
+  <div class="perf-cell"><div class="lbl">Total ROI</div><div class="val green">+0%</div></div>
   <div class="perf-cell"><div class="lbl">Hard Deadlines</div><div class="val green">0</div></div>
-  <div class="perf-cell"><div class="lbl">Avg Hold</div><div class="val white">24.4d</div></div>
+  <div class="perf-cell"><div class="lbl">Avg Hold</div><div class="val white">0.0d</div></div>
 </div>
 <!-- %%PERF_END%% -->
 
@@ -477,20 +477,7 @@ updateCalc(); // init
 
 // ── Trade Data (reverse date order) ───────────────────────────────────────────
 // %%TRADES_START%%
-const trades=[
-  {n:12,entry:'2025-05-28',evix:17.8,strike:22,exit:'2025-06-14',exvix:21.3,days:17,roi:40.1,roiBid:40.1,rsn:'AE',note:''},
-  {n:11,entry:'2025-04-15',evix:16.7,strike:21,exit:'2025-05-09',exvix:14.2,days:24,roi:-34.2,roiBid:-34.2,rsn:'AE',note:''},
-  {n:10,entry:'2025-02-20',evix:17.1,strike:21,exit:'2025-03-31',exvix:34.5,days:39,roi:171.4,roiBid:171.4,rsn:'AE',note:'COVID-style spike to 34'},
-  {n:9,entry:'2025-01-10',evix:16.4,strike:20,exit:'2025-02-03',exvix:14.8,days:24,roi:-31.0,roiBid:-31.0,rsn:'AE',note:''},
-  {n:8,entry:'2024-11-25',evix:15.8,strike:19,exit:'2024-12-20',exvix:18.9,days:25,roi:38.2,roiBid:38.2,rsn:'AE',note:''},
-  {n:7,entry:'2024-10-15',evix:17.3,strike:21,exit:'2024-11-08',exvix:14.7,days:24,roi:-24.8,roiBid:-24.8,rsn:'AE',note:''},
-  {n:6,entry:'2024-09-05',evix:16.9,strike:21,exit:'2024-09-27',exvix:15.4,days:22,roi:-17.9,roiBid:-17.9,rsn:'AE',note:''},
-  {n:5,entry:'2024-07-22',evix:18.1,strike:22,exit:'2024-08-09',exvix:38.2,days:18,roi:139.8,roiBid:139.8,rsn:'AE',note:'VIX spike to 38'},
-  {n:4,entry:'2024-06-10',evix:16.2,strike:20,exit:'2024-07-05',exvix:22.1,days:25,roi:84.6,roiBid:84.6,rsn:'AE',note:''},
-  {n:3,entry:'2024-05-01',evix:17.5,strike:21,exit:'2024-05-29',exvix:14.8,days:28,roi:-21.0,roiBid:-21.0,rsn:'AE',note:''},
-  {n:2,entry:'2024-03-20',evix:16.8,strike:21,exit:'2024-04-12',exvix:24.4,days:23,roi:63.2,roiBid:63.2,rsn:'AE',note:''},
-  {n:1,entry:'2024-01-15',evix:17.2,strike:21,exit:'2024-02-08',exvix:20.1,days:24,roi:30.8,roiBid:30.8,rsn:'AE',note:''}
-];
+const trades=[];
 // %%TRADES_END%%
 
 const tbody=document.getElementById('tradeTableBody');
