@@ -136,12 +136,12 @@ tr:hover td { background: #1c2128; }
   <div class="card c-in">
     <div class="lbl">Position</div>
     <div class="val green">IN</div>
-    <div class="hint">Day 1 of 91 max</div>
+    <div class="hint">Day 2 of 91 max</div>
   </div>
-  <div class="card c-buy">
-    <div class="lbl">Signal</div>
-    <div class="val green">BUY</div>
-    <div class="hint">Entered today — monitoring</div>
+  <div class="card c-hold">
+    <div class="lbl">Exit Signal</div>
+    <div class="val orange">HOLD</div>
+    <div class="hint">Exit prob: 15%</div>
   </div>
   <div class="card">
     <div class="lbl">Entry VIX</div>
@@ -150,7 +150,7 @@ tr:hover td { background: #1c2128; }
   </div>
   <div class="card">
     <div class="lbl">Current VIX</div>
-    <div class="val green">18.45</div>
+    <div class="val green">18.44</div>
     <div class="hint">Spot (intraday)</div>
   </div>
   <div class="card">
@@ -161,11 +161,11 @@ tr:hover td { background: #1c2128; }
   <div class="card">
     <div class="lbl">Stop-Loss Risk</div>
     <div class="val orange">MEDIUM</div>
-    <div class="hint">Negative ROI, 91d remaining</div>
+    <div class="hint">Negative ROI, 90d remaining</div>
   </div>
 </div>
 
-<div class="alert alert-ok">✓ BUY executed — position opened. Day 1 of 91. VIX 16.41, ask $4.12.</div>
+<div class="alert alert-ok">✓ Position monitored — ROI -2.9%, day 2, 90d remaining.</div>
 
 <!-- POSITION DETAIL -->
 <div class="sec">Position Detail</div>
@@ -174,12 +174,12 @@ tr:hover td { background: #1c2128; }
   <div class="cmp-head">
     <span></span>
     <span>Entry &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">2026-06-16</span></span>
-    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of 19:49 UTC</span></span>
+    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of 22:22 UTC</span></span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">VIX</span>
     <span class="cmp-val">16.41</span>
-    <span class="cmp-val green">18.45 <span class="badge badge-up">+12.4%</span></span>
+    <span class="cmp-val green">18.44 <span class="badge badge-up">+12.4%</span></span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">Option Bid</span>
@@ -189,12 +189,12 @@ tr:hover td { background: #1c2128; }
   <div class="cmp-row">
     <span class="cmp-key">Option Ask</span>
     <span class="cmp-val">$4.12 <span style="font-size:10px;color:#6e7681;">(paid)</span></span>
-    <span class="cmp-val">$4.25</span>
+    <span class="cmp-val">$4.70</span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">Implied Vol</span>
     <span class="cmp-val">110.2%</span>
-    <span class="cmp-val orange">110.2% <span class="badge badge-up">+0.0pp</span></span>
+    <span class="cmp-val orange">95.6% <span class="badge badge-down">-14.5pp</span></span>
   </div>
 </div>
 
@@ -206,25 +206,25 @@ tr:hover td { background: #1c2128; }
     <div class="pos-row"><span class="k">Strike</span><span class="v">VIX 20 Call</span></div>
     <div class="pos-row"><span class="k">Option Expiry</span><span class="v">2026-12-16</span></div>
     <div class="pos-row"><span class="k">Tenor</span><span class="v gray">180 calendar days</span></div>
-    <div class="pos-row"><span class="k">Days Held</span><span class="v">Day 1 of 91</span></div>
-    <div class="pos-row"><span class="k">Days Remaining</span><span class="v orange">91</span></div>
+    <div class="pos-row"><span class="k">Days Held</span><span class="v">Day 2 of 91</span></div>
+    <div class="pos-row"><span class="k">Days Remaining</span><span class="v orange">90</span></div>
     <div class="pos-row"><span class="k">Days to Expiry</span><span class="v orange">182</span></div>
     <div class="pos-row"><span class="k">Hard Deadline</span><span class="v red">2026-09-15</span></div>
     
     
-    <div class="pos-row"><span class="k">Last Trade Price</span><span class="v">$4.20</span></div>
+    <div class="pos-row"><span class="k">Last Trade Price</span><span class="v">$4.34</span></div>
   </div>
 
   <!-- METRICS & GREEKS -->
   <div class="pos-group">
     <h3>Metrics &amp; Greeks</h3>
     <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v red">-2.9%</span></div>
-    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.25 (6.1%)</span></div>
-    <div class="pos-row"><span class="k">Delta</span><span class="v">0.622</span></div>
-    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.78&times;</span></div>
-    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+$0.049</span></div>
-    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+1.19%</span></div>
-    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.31%/day</span></div>
+    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.70 (16.1%)</span></div>
+    <div class="pos-row"><span class="k">Delta</span><span class="v">0.597</span></div>
+    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.53&times;</span></div>
+    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+$0.050</span></div>
+    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+1.15%</span></div>
+    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.32%/day</span></div>
   </div>
 
 </div>
@@ -371,13 +371,13 @@ const SIGMA0=1.1016, R=0.045, TENOR=180, STRIKE=20;
 const ENTRY_ASK=4.12;   // ask price paid at entry
 const ENTRY_VIX=16.41;  // VIX at entry
 const ENTRY_DATE=new Date('2026-06-16');
-const DAYS_HELD=0;
-const CURR_VIX=18.45, CURR_SIGMA=1.1016;
-const CURR_BID=4.0, CURR_ASK=4.25;
+const DAYS_HELD=1;
+const CURR_VIX=18.44, CURR_SIGMA=0.9563;
+const CURR_BID=4.0, CURR_ASK=4.7;
 
-// ── Historical VIX path (days 0–-1) ────────────────────────────────
+// ── Historical VIX path (days 0–0) ────────────────────────────────
 const histVIX=[
-  16.40999984741211
+  16.40999984741211, 18.440000534057617
 ];
 // %%JSDATA_END%%
 const histDates=[],histBid=[],histAsk=[],histROI_bid=[];
@@ -578,7 +578,7 @@ if(CURR_BID>0 && CURR_ASK>0){
 // ── Trade Data (reverse date order) ───────────────────────────────────────────
 // %%TRADES_START%%
 const trades=[
-  {n:1,entry:'2026-06-16',evix:16.41,strike:20,exit:'OPEN',exvix:16.40999984741211,days:0,roi:-1.7,roiBid:-1.7,rsn:'OPEN',note:'auto'}
+  {n:1,entry:'2026-06-16',evix:16.41,strike:20,exit:'OPEN',exvix:18.440000534057617,days:1,roi:-2.9,roiBid:-2.9,rsn:'OPEN',note:'auto'}
 ];
 // %%TRADES_END%%
 

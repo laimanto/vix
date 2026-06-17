@@ -1,2 +1,3 @@
 date,vix,sigma,option_bid,option_ask,signal,in_position,days_held,roi_bid
 2026-06-16,16.40999984741211,1.1016,4.05,4.25,BUY,True,0,-1.7
+2026-06-17,18.440000534057617,0.9563,4.0,4.7,HOLD,True,1,-2.9

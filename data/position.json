@@ -8,7 +8,7 @@
   "strike": 20,
   "tenor": 180,
   "max_hold": 91,
-  "peak_vix": 16.41,
+  "peak_vix": 18.440000534057617,
   "expiry": "2026-12-16",
-  "days_held": 0
+  "days_held": 1
 }
