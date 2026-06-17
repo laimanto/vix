@@ -1,6 +1,6 @@
 # Runtime artifacts (not committed)
-production_v1/data/fetched.json
-production_v1/data/signal.json
+data/fetched.json
+data/signal.json
 __pycache__/
 *.pyc
 *.pyo
