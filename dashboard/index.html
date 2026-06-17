@@ -41,7 +41,19 @@ main { padding: 18px 24px; max-width: 1440px; margin: 0 auto; }
 .alert-ok   { background: #0a1f0e; border-color: #3fb950; color: #3fb950; }
 .alert-none { display: none; }
 
-/* POSITION DETAIL — 3 grouped columns */
+/* POSITION DETAIL */
+.pos-compare { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+.cmp-head, .cmp-row { display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; align-items: baseline; }
+.cmp-head { padding: 0 8px 8px; border-bottom: 2px solid #21262d; margin-bottom: 4px; }
+.cmp-head span { font-size: 11px; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; }
+.cmp-row { padding: 4px 8px; border-bottom: 1px solid #0d1117; }
+.cmp-row:last-child { border-bottom: none; }
+.cmp-key { font-size: 12px; color: #8b949e; }
+.cmp-val { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.cmp-val.gray { color: #8b949e; }
+.cmp-val.green { color: #3fb950; }
+.cmp-val.red { color: #f85149; }
+.cmp-val.orange { color: #e3b341; }
 .pos-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pos-group { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
 .pos-group h3 { font-size: 11px; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
@@ -124,12 +136,12 @@ tr:hover td { background: #1c2128; }
   <div class="card c-in">
     <div class="lbl">Position</div>
     <div class="val green">IN</div>
-    <div class="hint">Day 2 of 91 max</div>
+    <div class="hint">Day 1 of 91 max</div>
   </div>
-  <div class="card c-hold">
-    <div class="lbl">Exit Signal</div>
-    <div class="val orange">HOLD</div>
-    <div class="hint">Exit prob: 0%</div>
+  <div class="card c-buy">
+    <div class="lbl">Signal</div>
+    <div class="val green">BUY</div>
+    <div class="hint">Entered today — monitoring</div>
   </div>
   <div class="card">
     <div class="lbl">Entry VIX</div>
@@ -138,7 +150,7 @@ tr:hover td { background: #1c2128; }
   </div>
   <div class="card">
     <div class="lbl">Current VIX</div>
-    <div class="val green">16.60</div>
+    <div class="val green">16.89</div>
     <div class="hint">Spot (intraday)</div>
   </div>
   <div class="card">
@@ -153,41 +165,66 @@ tr:hover td { background: #1c2128; }
   </div>
 </div>
 
-<div class="alert alert-ok">✓ Position monitored — ROI -1.7%, day 2, 91d remaining.</div>
+<div class="alert alert-ok">✓ BUY executed — position opened. Day 1 of 91. VIX 16.41, ask $4.12.</div>
 
 <!-- POSITION DETAIL -->
-<div class="sec">Current Position Detail</div>
+<div class="sec">Position Detail</div>
+
+<div class="pos-compare">
+  <div class="cmp-head">
+    <span></span>
+    <span>Entry &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">2026-06-16</span></span>
+    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of EOD</span></span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">VIX</span>
+    <span class="cmp-val">16.41</span>
+    <span class="cmp-val green">16.89 <span class="badge badge-up">+2.9%</span></span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Option Bid</span>
+    <span class="cmp-val gray">$3.92 <span style="font-size:10px;color:#6e7681;">(est.)</span></span>
+    <span class="cmp-val red">$4.05</span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Option Ask</span>
+    <span class="cmp-val">$4.12 <span style="font-size:10px;color:#6e7681;">(paid)</span></span>
+    <span class="cmp-val">$4.25</span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Implied Vol</span>
+    <span class="cmp-val">110.2%</span>
+    <span class="cmp-val orange">110.2% <span class="badge badge-up">+0.0pp</span></span>
+  </div>
+</div>
+
 <div class="pos-groups">
 
-  <!-- GROUP 1: ENTRY -->
+  <!-- CONTRACT & TIME -->
   <div class="pos-group">
-    <h3>Entry</h3>
-    <div class="pos-row"><span class="k">Entry Date</span><span class="v">2026-06-16</span></div>
-    <div class="pos-row"><span class="k">Entry VIX</span><span class="v">16.41</span></div>
-    <div class="pos-row"><span class="k">Strike (&#8968;VIX&times;1.2&#8969;)</span><span class="v">VIX 20 Call</span></div>
+    <h3>Contract &amp; Time</h3>
+    <div class="pos-row"><span class="k">Strike</span><span class="v">VIX 20 Call</span></div>
     <div class="pos-row"><span class="k">Option Expiry</span><span class="v">2026-12-16</span></div>
     <div class="pos-row"><span class="k">Tenor</span><span class="v gray">180 calendar days</span></div>
-    <div class="pos-row"><span class="k">Entry Ask (paid)</span><span class="v">$4.12</span></div>
-    <div class="pos-row"><span class="k">Entry Implied Vol</span><span class="v">110.2%</span></div>
-  </div>
-
-  <!-- GROUP 2: CURRENT -->
-  <div class="pos-group">
-    <h3>Current</h3>
-    <div class="pos-row"><span class="k">Current VIX</span><span class="v green">16.60 <span class="badge badge-up">+1.2%</span></span></div>
-    <div class="pos-row"><span class="k">VIX vs Entry</span><span class="v green">+0.19 pts</span></div>
-    <div class="pos-row"><span class="k">Current Bid (sell at)</span><span class="v red">$4.05</span></div>
-    <div class="pos-row"><span class="k">Current Ask</span><span class="v">$4.25</span></div>
-    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.20 (4.8%)</span></div>
-    <div class="pos-row"><span class="k">Current Implied Vol</span><span class="v orange">110.2% <span class="badge badge-up">+0.0pp</span></span></div>
-    <div class="pos-row"><span class="k">Delta</span><span class="v">0.569</span></div>
-    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.28&times;</span></div>
-    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.36%/day</span></div>
-    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v red">-1.7%</span></div>
-    <div class="pos-row"><span class="k">Days Held</span><span class="v">2</span></div>
+    <div class="pos-row"><span class="k">Days Held</span><span class="v">Day 1 of 91</span></div>
     <div class="pos-row"><span class="k">Days Remaining</span><span class="v orange">91</span></div>
     <div class="pos-row"><span class="k">Days to Expiry</span><span class="v orange">183</span></div>
     <div class="pos-row"><span class="k">Hard Deadline</span><span class="v red">2026-09-15</span></div>
+    
+    
+    
+  </div>
+
+  <!-- METRICS & GREEKS -->
+  <div class="pos-group">
+    <h3>Metrics &amp; Greeks</h3>
+    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v red">-1.7%</span></div>
+    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.20 (4.8%)</span></div>
+    <div class="pos-row"><span class="k">Delta</span><span class="v">0.578</span></div>
+    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.35&times;</span></div>
+    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+$0.046</span></div>
+    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+1.12%</span></div>
+    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.35%/day</span></div>
   </div>
 
 </div>
@@ -221,11 +258,11 @@ tr:hover td { background: #1c2128; }
       </div>
       <div class="slider-group">
         <label>Current VIX <span id="calcVixVal">18.50</span></label>
-        <input type="range" id="calcVix" min="10" max="50" step="0.5" value="18.5" oninput="updateCalc()">
+        <input type="range" id="calcVix" min="10" max="50" step="0.01" value="18.50" oninput="updateCalc()">
       </div>
       <div class="slider-group">
-        <label>Implied Volatility (%) <span id="calcIVVal">127%</span></label>
-        <input type="range" id="calcIV" min="50" max="300" step="1" value="127" oninput="updateCalc()">
+        <label>Current IV (%) <span id="calcIVVal">127%</span></label>
+        <input type="range" id="calcIV" min="50" max="300" step="0.1" value="127.0" oninput="updateCalc()">
       </div>
       <div class="slider-group">
         <label>Days Held <span id="calcDaysVal">0</span></label>
@@ -335,7 +372,8 @@ const ENTRY_ASK=4.12;   // ask price paid at entry
 const ENTRY_VIX=16.41;  // VIX at entry
 const ENTRY_DATE=new Date('2026-06-16');
 const DAYS_HELD=0;
-const CURR_VIX=16.40999984741211, CURR_SIGMA=1.1016;
+const CURR_VIX=16.89, CURR_SIGMA=1.1016;
+const CURR_BID=4.05, CURR_ASK=4.25;
 
 // ── Historical VIX path (days 0–-1) ────────────────────────────────
 const histVIX=[
@@ -422,8 +460,8 @@ function updateCalc(){
   const S=+document.getElementById('calcVix').value;
   const sigma=+document.getElementById('calcIV').value/100;
   const d=+document.getElementById('calcDays').value;
-  document.getElementById('calcVixVal').textContent=S.toFixed(1);
-  document.getElementById('calcIVVal').textContent=Math.round(sigma*100)+'%';
+  document.getElementById('calcVixVal').textContent=S.toFixed(2);
+  document.getElementById('calcIVVal').textContent=(sigma*100).toFixed(1)+'%';
   document.getElementById('calcDaysVal').textContent=d;
 
   // Entry parameters: read from inputs, fall back to JS constants
@@ -518,11 +556,24 @@ function updateCalc(){
   },{responsive:true});
 }
 // Pre-populate entry inputs from position data (if in position)
-if(ENTRY_ASK>0) document.getElementById('calcEntryAsk').value=ENTRY_ASK.toFixed(2);
-if(ENTRY_VIX>0) document.getElementById('calcEntryVix').value=ENTRY_VIX.toFixed(1);
-if(DAYS_HELD>0) document.getElementById('calcDays').value=DAYS_HELD;
-if(CURR_VIX>0)  document.getElementById('calcVix').value=CURR_VIX.toFixed(1);
-updateCalc(); // init
+if(ENTRY_ASK>0)   document.getElementById('calcEntryAsk').value=ENTRY_ASK.toFixed(2);
+if(ENTRY_VIX>0)   document.getElementById('calcEntryVix').value=ENTRY_VIX.toFixed(2);
+if(DAYS_HELD>0)   document.getElementById('calcDays').value=DAYS_HELD;
+if(CURR_VIX>0)    document.getElementById('calcVix').value=CURR_VIX.toFixed(2);
+if(CURR_SIGMA>0)  document.getElementById('calcIV').value=(CURR_SIGMA*100).toFixed(1);
+updateCalc(); // renders charts + sets slider labels
+
+// Override output with actual yfinance prices — BS only runs when sliders change
+if(CURR_BID>0 && CURR_ASK>0){
+  const _sp=+(CURR_ASK-CURR_BID).toFixed(2);
+  const _mid=(CURR_BID+CURR_ASK)/2;
+  document.getElementById('cBid').textContent='$'+CURR_BID.toFixed(2);
+  document.getElementById('cAsk').textContent='$'+CURR_ASK.toFixed(2);
+  document.getElementById('cSpread').textContent='$'+_sp.toFixed(2);
+  document.getElementById('cSpreadPct').textContent=(_sp/_mid*100).toFixed(1)+'%';
+  if(ENTRY_ASK>0)
+    document.getElementById('cROIBid').innerHTML=fmtROI((CURR_BID-ENTRY_ASK)/ENTRY_ASK*100);
+}
 
 // ── Trade Data (reverse date order) ───────────────────────────────────────────
 // %%TRADES_START%%

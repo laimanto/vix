@@ -80,9 +80,9 @@ def fetch_spot_vix():
 
 def fetch_option(strike: int, entry_date_str: str):
     """
-    Fetch bid/ask for the VIX call at the given strike.
-    Finds the option chain expiry closest to entry_date + TENOR days.
-    Returns (bid, ask, implied_vol, expiry_used).
+    Fetch live option data for the VIX call at the given strike.
+    Finds the chain expiry closest to entry_date + TENOR days.
+    Returns a dict with bid, ask, iv, expiry and all available yfinance fields.
     """
     entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d').date()
     target_expiry = entry_date + __import__('datetime').timedelta(days=TENOR)
@@ -92,7 +92,6 @@ def fetch_option(strike: int, entry_date_str: str):
     if not expiries:
         raise RuntimeError('No VIX option expiries found')
 
-    # Pick closest expiry to target
     expiry = min(expiries, key=lambda e: abs(
         (datetime.strptime(e, '%Y-%m-%d').date() - target_expiry).days
     ))
@@ -100,24 +99,40 @@ def fetch_option(strike: int, entry_date_str: str):
     chain = ticker.option_chain(expiry)
     calls = chain.calls
 
-    # Filter to our strike
     row = calls[calls['strike'] == float(strike)]
     if row.empty:
-        # Fall back to nearest available strike
         row = calls.iloc[(calls['strike'] - float(strike)).abs().argsort()[:1]]
 
-    bid  = float(row['bid'].iloc[0])
-    ask  = float(row['ask'].iloc[0])
-    iv   = float(row['impliedVolatility'].iloc[0])
-    last = float(row['lastPrice'].iloc[0])
+    r = row.iloc[0]
+    bid  = float(r['bid'])
+    ask  = float(r['ask'])
+    iv   = float(r['impliedVolatility'])
+    last = float(r['lastPrice'])
 
-    # If market is closed bid/ask may be 0; fall back to last price ±3%
+    # If market is closed bid/ask may be 0; fall back to last price with fixed spread
     if bid <= 0 and ask <= 0:
-        spread_est = max(0.10, last * 0.06)
-        bid = round(last - spread_est / 2, 2)
-        ask = round(last + spread_est / 2, 2)
+        bid = round(last - 0.10, 2)
+        ask = round(last + 0.10, 2)
 
-    return round(bid, 2), round(ask, 2), round(iv, 4), expiry
+    def _int(col):
+        try: return int(r[col]) if col in row.index and r[col] == r[col] else 0
+        except: return 0
+
+    def _str(col):
+        try: return str(r[col]) if col in row.index else ''
+        except: return ''
+
+    return {
+        'bid':            round(bid, 2),
+        'ask':            round(ask, 2),
+        'iv':             round(iv, 4),
+        'expiry':         expiry,
+        'last_price':     round(last, 2),
+        'volume':         _int('volume'),
+        'open_interest':  _int('openInterest'),
+        'last_trade_date': _str('lastTradeDate'),
+        'contract_symbol': _str('contractSymbol'),
+    }
 
 
 def estimate_sigma_from_iv(iv_raw):
@@ -154,10 +169,26 @@ def main():
         entry_date = fetch_date
 
     print(f'Fetching option chain  strike={strike}  entry={entry_date}...')
+    fetch_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     try:
-        bid, ask, iv, expiry = fetch_option(strike, entry_date)
-        sigma = estimate_sigma_from_iv(iv)
-        print(f'  Expiry: {expiry}  Bid: {bid}  Ask: {ask}  IV: {sigma:.4f}')
+        opt = fetch_option(strike, entry_date)
+        sigma = estimate_sigma_from_iv(opt['iv'])
+        print(f'  Expiry: {opt["expiry"]}  Bid: {opt["bid"]}  Ask: {opt["ask"]}  '
+              f'IV: {sigma:.4f}  Vol: {opt["volume"]}  OI: {opt["open_interest"]}')
+        result.update({
+            'strike':            strike,
+            'option_bid':        opt['bid'],
+            'option_ask':        opt['ask'],
+            'sigma':             sigma,
+            'expiry_used':       opt['expiry'],
+            'option_last_price': opt['last_price'],
+            'option_volume':     opt['volume'],
+            'option_open_interest': opt['open_interest'],
+            'option_last_trade_date': opt['last_trade_date'],
+            'option_contract':   opt['contract_symbol'],
+            'option_fetch_time': fetch_time,
+            'option_source':     'yfinance',
+        })
     except Exception as e:
         print(f'  Option fetch failed: {e}  — using BS estimate')
         daily_log = list(__import__('csv').DictReader(open(DATA_DIR / 'daily_log.csv')))
@@ -170,17 +201,22 @@ def main():
         else:
             T = TENOR / 365
         mid = bs_call(vix, strike, T, sigma)
-        bid = round(mid - 0.10, 2)   # fixed $0.20 spread observed in VIX option market
+        bid = round(mid - 0.10, 2)
         ask = round(mid + 0.10, 2)
-        expiry = 'estimated'
-
-    result.update({
-        'strike':     strike,
-        'option_bid': bid,
-        'option_ask': ask,
-        'sigma':      sigma,
-        'expiry_used': expiry,
-    })
+        result.update({
+            'strike':            strike,
+            'option_bid':        bid,
+            'option_ask':        ask,
+            'sigma':             sigma,
+            'expiry_used':       'estimated',
+            'option_last_price': 0,
+            'option_volume':     0,
+            'option_open_interest': 0,
+            'option_last_trade_date': '',
+            'option_contract':   '',
+            'option_fetch_time': fetch_time,
+            'option_source':     'bs_estimate',
+        })
 
     # Spot VIX: current intraday price (not EOD-filtered) — used for live ROI display
     print('Fetching spot VIX (live)...')

@@ -8,7 +8,7 @@ Can be run standalone for testing:  python gen_dashboard.py [--mock]
 
 import csv, json, math, re, sys, argparse
 from pathlib import Path
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 
 BASE_DIR  = Path(__file__).parent.parent
 DATA_DIR  = BASE_DIR / 'data'
@@ -63,6 +63,27 @@ def delta_call(S, K, T, sigma, r=R):
         return 1.0 if S > K else 0.0
     d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
     return _ncdf(d1)
+
+
+def vega_1pp(S, K, T, sigma, r=R):
+    """Dollar change in BS call price per 1 percentage-point rise in IV."""
+    if T <= 0:
+        return 0.0
+    return round(bs_call(S, K, T, sigma + 0.01, r) - bs_call(S, K, T, sigma, r), 4)
+
+
+def implied_vol(S, K, T, target_mid, r=R):
+    """Bisection-solve for IV that makes BS call reproduce target_mid price."""
+    if T <= 0 or target_mid <= 0:
+        return SIGMA0
+    lo, hi = 0.01, 10.0
+    for _ in range(60):
+        sig = (lo + hi) / 2
+        if bs_call(S, K, T, sig, r) < target_mid:
+            lo = sig
+        else:
+            hi = sig
+    return (lo + hi) / 2
 
 
 # ── Data loading ───────────────────────────────────────────────────────────────
@@ -176,6 +197,22 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades
     curr_bid  = float(fetched.get('option_bid', _log_bid)) if fetched else _log_bid
     roi_bid   = round((curr_bid - entry_ask) / entry_ask * 100, 1) if entry_ask > 0 else 0.0
 
+    # Extra yfinance market data (best-effort; may be 0 if not fetched yet)
+    opt_volume   = int(fetched.get('option_volume', 0))     if fetched else 0
+    opt_oi       = int(fetched.get('option_open_interest', 0)) if fetched else 0
+    opt_last     = float(fetched.get('option_last_price', 0)) if fetched else 0.0
+    opt_source   = fetched.get('option_source', '')         if fetched else ''
+    opt_fetch_ts = fetched.get('option_fetch_time', '')     if fetched else ''
+    # Convert UTC fetch timestamp to a short "HH:MM UTC" label for display
+    if opt_fetch_ts:
+        try:
+            _ft = datetime.strptime(opt_fetch_ts, '%Y-%m-%dT%H:%M:%SZ')
+            opt_fetch_label = _ft.strftime('%H:%M UTC')
+        except Exception:
+            opt_fetch_label = opt_fetch_ts[:16]
+    else:
+        opt_fetch_label = 'EOD'
+
     # Derived
     spread_dollar = round(curr_ask_p - curr_bid, 2)
     mid_price     = (curr_bid + curr_ask_p) / 2
@@ -199,18 +236,21 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades
     delta         = delta_call(curr_vix, strike, rem_T, curr_sigma)
     curr_mid      = (curr_bid + curr_ask_p) / 2
     lam           = delta * (curr_vix / curr_mid) if curr_mid > 0 else 0.0
-    vix_change    = round(curr_vix - entry_vix, 2)
-    vix_change_pct = round(vix_change / entry_vix * 100, 1)
+    vega_d        = vega_1pp(curr_vix, strike, rem_T, curr_sigma)
+    vega_p        = round(vega_d / curr_mid * 100, 2) if curr_mid > 0 else 0.0
+    vix_change      = round(curr_vix - entry_vix, 2)
+    vix_change_pct  = round(vix_change / entry_vix * 100, 1)
     sigma_change_pp = round((curr_sigma - entry_sigma) * 100, 1)
+    entry_bid_est   = round(entry_ask - 0.20, 2)  # fixed ±$0.10 spread applied in reverse
 
     signal   = signal_info.get('signal', 'HOLD')
     exit_prob = signal_info.get('exit_prob', None)
     ep_str   = f'{int(exit_prob*100)}%' if exit_prob is not None else '—'
 
-    # Trading-day count: each day runs from 4:35pm to next 4:35pm (matching pipeline schedule).
-    # This ensures Day 1 display persists until 4:35pm the next calendar day.
-    entry_4pm = datetime.strptime(entry_date, '%Y-%m-%d').replace(hour=16, minute=35)
-    trading_days_held = max(0, int((datetime.now() - entry_4pm).total_seconds() / 86400))
+    # Trading-day boundary: 4:35pm EDT = 20:35 UTC (pipeline schedule).
+    # Use UTC throughout so the count is identical on the Actions runner and local machines.
+    entry_4pm = datetime.strptime(entry_date, '%Y-%m-%d').replace(hour=20, minute=35, tzinfo=timezone.utc)
+    trading_days_held = max(0, int((datetime.now(timezone.utc) - entry_4pm).total_seconds() / 86400))
     day_num = trading_days_held + 1  # Day 1, Day 2, ...
 
     # On Day 1 (first 24h since entry close) always show BUY — exit model hasn't had its first run yet
@@ -309,38 +349,63 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades
 <div class="alert {alert_class}">{alert_txt}</div>
 
 <!-- POSITION DETAIL -->
-<div class="sec">Current Position Detail</div>
+<div class="sec">Position Detail</div>
+
+<div class="pos-compare">
+  <div class="cmp-head">
+    <span></span>
+    <span>Entry &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">{entry_date}</span></span>
+    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of {opt_fetch_label}</span></span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">VIX</span>
+    <span class="cmp-val">{entry_vix:.2f}</span>
+    <span class="cmp-val {vix_badge_color}">{curr_vix:.2f} <span class="badge badge-{vix_badge_dir}">{vix_badge_sign}{vix_change_pct:.1f}%</span></span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Option Bid</span>
+    <span class="cmp-val gray">${entry_bid_est:.2f} <span style="font-size:10px;color:#6e7681;">(est.)</span></span>
+    <span class="cmp-val {'green' if roi_bid >= 0 else 'red'}">${curr_bid:.2f}</span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Option Ask</span>
+    <span class="cmp-val">${entry_ask:.2f} <span style="font-size:10px;color:#6e7681;">(paid)</span></span>
+    <span class="cmp-val">${curr_ask_p:.2f}</span>
+  </div>
+  <div class="cmp-row">
+    <span class="cmp-key">Implied Vol</span>
+    <span class="cmp-val">{entry_sigma*100:.1f}%</span>
+    <span class="cmp-val orange">{curr_sigma*100:.1f}% <span class="badge badge-{sigma_badge_dir}">{sigma_sign}{sigma_change_pp:.1f}pp</span></span>
+  </div>
+</div>
+
 <div class="pos-groups">
 
-  <!-- GROUP 1: ENTRY -->
+  <!-- CONTRACT & TIME -->
   <div class="pos-group">
-    <h3>Entry</h3>
-    <div class="pos-row"><span class="k">Entry Date</span><span class="v">{entry_date}</span></div>
-    <div class="pos-row"><span class="k">Entry VIX</span><span class="v">{entry_vix:.2f}</span></div>
-    <div class="pos-row"><span class="k">Strike (&#8968;VIX&times;1.2&#8969;)</span><span class="v">VIX {strike} Call</span></div>
+    <h3>Contract &amp; Time</h3>
+    <div class="pos-row"><span class="k">Strike</span><span class="v">VIX {strike} Call</span></div>
     <div class="pos-row"><span class="k">Option Expiry</span><span class="v">{option_expiry}</span></div>
     <div class="pos-row"><span class="k">Tenor</span><span class="v gray">180 calendar days</span></div>
-    <div class="pos-row"><span class="k">Entry Ask (paid)</span><span class="v">${entry_ask:.2f}</span></div>
-    <div class="pos-row"><span class="k">Entry Implied Vol</span><span class="v">{entry_sigma*100:.1f}%</span></div>
-  </div>
-
-  <!-- GROUP 2: CURRENT -->
-  <div class="pos-group">
-    <h3>Current</h3>
-    <div class="pos-row"><span class="k">Current VIX</span><span class="v {vix_badge_color}">{curr_vix:.2f} <span class="badge badge-{vix_badge_dir}">{vix_badge_sign}{vix_change_pct:.1f}%</span></span></div>
-    <div class="pos-row"><span class="k">VIX vs Entry</span><span class="v {'green' if vix_change >= 0 else 'red'}">{'+' if vix_change >= 0 else ''}{vix_change:.2f} pts</span></div>
-    <div class="pos-row"><span class="k">Current Bid (sell at)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">${curr_bid:.2f}</span></div>
-    <div class="pos-row"><span class="k">Current Ask</span><span class="v">${curr_ask_p:.2f}</span></div>
-    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">${spread_dollar:.2f} ({spread_pct:.1f}%)</span></div>
-    <div class="pos-row"><span class="k">Current Implied Vol</span><span class="v orange">{curr_sigma*100:.1f}% <span class="badge badge-{sigma_badge_dir}">{sigma_sign}{sigma_change_pp:.1f}pp</span></span></div>
-    <div class="pos-row"><span class="k">Delta</span><span class="v">{delta:.3f}</span></div>
-    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">{lam:.2f}&times;</span></div>
-    <div class="pos-row"><span class="k">Theta</span><span class="v red">{theta_sign}{theta:.2f}%/day</span></div>
-    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">{roi_str}</span></div>
-    <div class="pos-row"><span class="k">Days Held</span><span class="v">{day_num}</span></div>
+    <div class="pos-row"><span class="k">Days Held</span><span class="v">Day {day_num} of {MAX_HOLD}</span></div>
     <div class="pos-row"><span class="k">Days Remaining</span><span class="v orange">{days_remaining}</span></div>
     <div class="pos-row"><span class="k">Days to Expiry</span><span class="v orange">{days_to_expiry}</span></div>
     <div class="pos-row"><span class="k">Hard Deadline</span><span class="v red">{hard_deadline}</span></div>
+    {f'<div class="pos-row"><span class="k">Volume</span><span class="v">{opt_volume:,}</span></div>' if opt_volume else ''}
+    {f'<div class="pos-row"><span class="k">Open Interest</span><span class="v">{opt_oi:,}</span></div>' if opt_oi else ''}
+    {f'<div class="pos-row"><span class="k">Last Trade Price</span><span class="v">${opt_last:.2f}</span></div>' if opt_last else ''}
+  </div>
+
+  <!-- METRICS & GREEKS -->
+  <div class="pos-group">
+    <h3>Metrics &amp; Greeks</h3>
+    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">{roi_str}</span></div>
+    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">${spread_dollar:.2f} ({spread_pct:.1f}%)</span></div>
+    <div class="pos-row"><span class="k">Delta</span><span class="v">{delta:.3f}</span></div>
+    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">{lam:.2f}&times;</span></div>
+    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+${vega_d:.3f}</span></div>
+    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+{vega_p:.2f}%</span></div>
+    <div class="pos-row"><span class="k">Theta</span><span class="v red">{theta_sign}{theta:.2f}%/day</span></div>
   </div>
 
 </div>'''
@@ -461,6 +526,7 @@ def gen_jsdata(position, daily_log, fetched=None):
                 f'const ENTRY_ASK=0;\nconst ENTRY_VIX=0;\n'
                 f'const ENTRY_DATE=new Date();\nconst DAYS_HELD=0;\n'
                 f'const CURR_VIX={curr_vix}, CURR_SIGMA={curr_sigma};\n'
+                f'const CURR_BID=0, CURR_ASK=0;\n'
                 f'const histVIX=[];')
 
     entry_ask   = float(position['entry_ask'])
@@ -470,6 +536,15 @@ def gen_jsdata(position, daily_log, fetched=None):
     curr_vix    = float(daily_log[-1]['vix'])
     curr_sigma  = float(daily_log[-1]['sigma'])
     days_held   = int(daily_log[-1]['days_held'])
+
+    # Use spot VIX — same source as status display
+    if fetched and fetched.get('spot_vix'):
+        curr_vix = float(fetched['spot_vix'])
+
+    # Actual fetched option prices (yfinance) — exported so JS can display them directly
+    curr_bid_f = float(fetched.get('option_bid', daily_log[-1]['option_bid'])) if fetched else float(daily_log[-1]['option_bid'])
+    curr_ask_f = float(daily_log[-1]['option_ask'])
+
     hist_vix    = [float(r['vix']) for r in daily_log]
     vix_js      = ', '.join(str(v) for v in hist_vix)
     n_per_line  = 10
@@ -486,6 +561,7 @@ const ENTRY_VIX={entry_vix};  // VIX at entry
 const ENTRY_DATE=new Date('{entry_date}');
 const DAYS_HELD={days_held};
 const CURR_VIX={curr_vix}, CURR_SIGMA={curr_sigma};
+const CURR_BID={curr_bid_f}, CURR_ASK={curr_ask_f};
 
 // ── Historical VIX path (days 0–{days_held-1}) ────────────────────────────────
 const histVIX=[

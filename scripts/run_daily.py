@@ -10,7 +10,7 @@ Sequence:
 """
 
 import argparse, csv, json, math, shutil, sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -100,8 +100,8 @@ def auto_manage_trade(fetched, signal_info, position):
 
         # Grace period: each trading day runs 4:35pm → next 4:35pm.
         # Don't exit until at least one full trading day has elapsed since entry close.
-        entry_4pm = datetime.strptime(entry_date, '%Y-%m-%d').replace(hour=16, minute=35)
-        trading_days_held = max(0, int((datetime.now() - entry_4pm).total_seconds() / 86400))
+        entry_4pm = datetime.strptime(entry_date, '%Y-%m-%d').replace(hour=20, minute=35, tzinfo=timezone.utc)
+        trading_days_held = max(0, int((datetime.now(timezone.utc) - entry_4pm).total_seconds() / 86400))
         if trading_days_held < 1:
             print(f'  [auto-trade] Grace period — SELL ignored (Day 1 still in progress, {trading_days_held:.2f} trading days elapsed)')
             return position
@@ -184,25 +184,47 @@ def main():
     if position_early.get('in_position'):
         entry_date_early = position_early.get('entry_date', '')
         if entry_date_early:
-            entry_4pm_early = datetime.strptime(entry_date_early, '%Y-%m-%d').replace(hour=16, minute=35)
-            secs_since_close = (datetime.now() - entry_4pm_early).total_seconds()
+            entry_4pm_early = datetime.strptime(entry_date_early, '%Y-%m-%d').replace(hour=20, minute=35, tzinfo=timezone.utc)
+            secs_since_close = (datetime.now(timezone.utc) - entry_4pm_early).total_seconds()
             if 0 <= secs_since_close < 86400:  # less than 24h since entry close
                 in_day1 = True
                 print(f'\n[Day 1 lock] {secs_since_close/3600:.1f}h since entry close — skipping fetch/agent, using entry-day data')
                 # Still refresh spot VIX so dashboard shows live price and ROI
                 try:
-                    import yfinance as _yf
-                    _hist = _yf.Ticker('^VIX').history(period='2d')
-                    if not _hist.empty:
-                        _spot = round(float(_hist['Close'].iloc[-1]), 2)
-                        _fp = DATA_DIR / 'fetched.json'
-                        if _fp.exists():
-                            _fd = json.loads(_fp.read_text())
-                            _fd['spot_vix'] = _spot
-                            _fp.write_text(json.dumps(_fd, indent=2))
-                            print(f'  [Day 1 spot] spot_vix updated to {_spot}')
+                    import fetch_data as _fd_mod
+                    from datetime import timezone as _tz
+                    _fp = DATA_DIR / 'fetched.json'
+                    _fd = json.loads(_fp.read_text()) if _fp.exists() else {}
+
+                    # Refresh spot VIX
+                    _spot = _fd_mod.fetch_spot_vix()
+                    if _spot is not None:
+                        _fd['spot_vix'] = _spot
+                        print(f'  [Day 1 live] spot_vix -> {_spot}')
+
+                    # Refresh live option bid/ask/IV and market data
+                    _strike = int(position_early.get('strike', 0))
+                    _entry  = position_early.get('entry_date', '')
+                    if _strike and _entry:
+                        try:
+                            _opt = _fd_mod.fetch_option(_strike, _entry)
+                            _fd['option_bid']        = _opt['bid']
+                            _fd['option_ask']        = _opt['ask']
+                            _fd['sigma']             = _fd_mod.estimate_sigma_from_iv(_opt['iv'])
+                            _fd['option_last_price'] = _opt['last_price']
+                            _fd['option_volume']     = _opt['volume']
+                            _fd['option_open_interest'] = _opt['open_interest']
+                            _fd['option_last_trade_date'] = _opt['last_trade_date']
+                            _fd['option_contract']   = _opt['contract_symbol']
+                            _fd['option_fetch_time'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                            _fd['option_source']     = 'yfinance'
+                            print(f'  [Day 1 live] option -> bid={_opt["bid"]} ask={_opt["ask"]} iv={_opt["iv"]:.4f}')
+                        except Exception as _oe:
+                            print(f'  [Day 1 live] option refresh failed: {_oe}')
+
+                    _fp.write_text(json.dumps(_fd, indent=2))
                 except Exception as _e:
-                    print(f'  [Day 1 spot] update skipped: {_e}')
+                    print(f'  [Day 1 live] refresh skipped: {_e}')
 
     # Step 1: Fetch VIX + option data
     if not args.skip_fetch and not in_day1:

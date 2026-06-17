@@ -41,7 +41,19 @@ main { padding: 18px 24px; max-width: 1440px; margin: 0 auto; }
 .alert-ok   { background: #0a1f0e; border-color: #3fb950; color: #3fb950; }
 .alert-none { display: none; }
 
-/* POSITION DETAIL — 3 grouped columns */
+/* POSITION DETAIL */
+.pos-compare { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+.cmp-head, .cmp-row { display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; align-items: baseline; }
+.cmp-head { padding: 0 8px 8px; border-bottom: 2px solid #21262d; margin-bottom: 4px; }
+.cmp-head span { font-size: 11px; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; }
+.cmp-row { padding: 4px 8px; border-bottom: 1px solid #0d1117; }
+.cmp-row:last-child { border-bottom: none; }
+.cmp-key { font-size: 12px; color: #8b949e; }
+.cmp-val { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.cmp-val.gray { color: #8b949e; }
+.cmp-val.green { color: #3fb950; }
+.cmp-val.red { color: #f85149; }
+.cmp-val.orange { color: #e3b341; }
 .pos-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pos-group { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
 .pos-group h3 { font-size: 11px; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
@@ -214,11 +226,11 @@ tr:hover td { background: #1c2128; }
       </div>
       <div class="slider-group">
         <label>Current VIX <span id="calcVixVal">18.50</span></label>
-        <input type="range" id="calcVix" min="10" max="50" step="0.5" value="18.5" oninput="updateCalc()">
+        <input type="range" id="calcVix" min="10" max="50" step="0.01" value="18.50" oninput="updateCalc()">
       </div>
       <div class="slider-group">
-        <label>Implied Volatility (%) <span id="calcIVVal">127%</span></label>
-        <input type="range" id="calcIV" min="50" max="300" step="1" value="127" oninput="updateCalc()">
+        <label>Current IV (%) <span id="calcIVVal">127%</span></label>
+        <input type="range" id="calcIV" min="50" max="300" step="0.1" value="127.0" oninput="updateCalc()">
       </div>
       <div class="slider-group">
         <label>Days Held <span id="calcDaysVal">0</span></label>
@@ -328,6 +340,7 @@ const ENTRY_ASK=4.93;   // ask price paid at entry
 const ENTRY_DATE=new Date('2026-05-14');
 const DAYS_HELD=33;
 const CURR_VIX=18.50, CURR_SIGMA=1.273;
+const CURR_BID=5.37, CURR_ASK=5.67;
 
 // ── Historical VIX path (days 0–32) ───────────────────────────────────────────
 const histVIX=[
@@ -417,8 +430,8 @@ function updateCalc(){
   const S=+document.getElementById('calcVix').value;
   const sigma=+document.getElementById('calcIV').value/100;
   const d=+document.getElementById('calcDays').value;
-  document.getElementById('calcVixVal').textContent=S.toFixed(1);
-  document.getElementById('calcIVVal').textContent=Math.round(sigma*100)+'%';
+  document.getElementById('calcVixVal').textContent=S.toFixed(2);
+  document.getElementById('calcIVVal').textContent=(sigma*100).toFixed(1)+'%';
   document.getElementById('calcDaysVal').textContent=d;
 
   // Entry parameters: read from inputs, fall back to JS constants
@@ -513,11 +526,24 @@ function updateCalc(){
   },{responsive:true});
 }
 // Pre-populate entry inputs from position data (if in position)
-if(ENTRY_ASK>0) document.getElementById('calcEntryAsk').value=ENTRY_ASK.toFixed(2);
-if(ENTRY_VIX>0) document.getElementById('calcEntryVix').value=ENTRY_VIX.toFixed(1);
-if(DAYS_HELD>0) document.getElementById('calcDays').value=DAYS_HELD;
-if(CURR_VIX>0)  document.getElementById('calcVix').value=CURR_VIX.toFixed(1);
-updateCalc(); // init
+if(ENTRY_ASK>0)   document.getElementById('calcEntryAsk').value=ENTRY_ASK.toFixed(2);
+if(ENTRY_VIX>0)   document.getElementById('calcEntryVix').value=ENTRY_VIX.toFixed(2);
+if(DAYS_HELD>0)   document.getElementById('calcDays').value=DAYS_HELD;
+if(CURR_VIX>0)    document.getElementById('calcVix').value=CURR_VIX.toFixed(2);
+if(CURR_SIGMA>0)  document.getElementById('calcIV').value=(CURR_SIGMA*100).toFixed(1);
+updateCalc(); // renders charts + sets slider labels
+
+// Override output with actual yfinance prices — BS only runs when sliders change
+if(CURR_BID>0 && CURR_ASK>0){
+  const _sp=+(CURR_ASK-CURR_BID).toFixed(2);
+  const _mid=(CURR_BID+CURR_ASK)/2;
+  document.getElementById('cBid').textContent='$'+CURR_BID.toFixed(2);
+  document.getElementById('cAsk').textContent='$'+CURR_ASK.toFixed(2);
+  document.getElementById('cSpread').textContent='$'+_sp.toFixed(2);
+  document.getElementById('cSpreadPct').textContent=(_sp/_mid*100).toFixed(1)+'%';
+  if(ENTRY_ASK>0)
+    document.getElementById('cROIBid').innerHTML=fmtROI((CURR_BID-ENTRY_ASK)/ENTRY_ASK*100);
+}
 
 // ── Trade Data (reverse date order) ───────────────────────────────────────────
 // %%TRADES_START%%
