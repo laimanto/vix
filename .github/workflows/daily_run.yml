@@ -2,13 +2,11 @@ name: VIX Strategy Daily Run
 
 on:
   schedule:
-    # 21:00 UTC = ~17:00 EDT (summer) / ~16:00 EST (winter)
-    # yfinance EOD data is fully settled by this time.
-    - cron: '35 20 * * 1-5'   # 4:35pm EDT (20:35 UTC), weekdays only (Mon–Fri)
+    - cron: '35 20 * * 1-5'   # 4:35pm EDT (20:35 UTC), weekdays only (Mon-Fri)
   workflow_dispatch:           # allow manual trigger from GitHub UI
 
 permissions:
-  contents: write              # needed to push updated CSVs + index.html back
+  contents: write
 
 jobs:
   daily-run:
@@ -21,6 +19,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Pull immediately after checkout so the pipeline always runs with the
+      # latest code and template — even if the checkout commit was stale.
+      - name: Pull latest code
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5.6.0
         with:
@@ -31,27 +37,25 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run daily pipeline
-        run: |
-          cd scripts
-          python run_daily.py
+        run: python scripts/run_daily.py
         env:
           PYTHONPATH: ${{ github.workspace }}/scripts
 
       - name: Commit updated data + dashboard
         run: |
-          git config --global user.name  "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # Guard: remove fetched.json from index if it was re-introduced by an old commit
+          git rm --cached data/fetched.json 2>/dev/null || true
 
-          # Move branch pointer to latest origin/main without touching generated files,
-          # so the commit lands on top of any pushes made since checkout — no rebase needed.
-          git fetch origin main
-          git reset --soft origin/main
-
-          git add data/daily_log.csv   \
-                  data/option_price.csv \
-                  data/position.json    \
-                  data/trades.csv       \
+          git add data/daily_log.csv    \
+                  data/option_price.csv  \
+                  data/position.json     \
+                  data/trades.csv        \
                   dashboard/index.html
-          git diff --staged --quiet && echo "Nothing changed" || \
+
+          git diff --staged --quiet && echo "Nothing to commit" || \
             git commit -m "Daily update $(date -u +'%Y-%m-%d')"
-          git push origin main
+
+          # Push; if someone pushed between our pull and now, rebase and retry.
+          # -X theirs: in conflicts prefer the replayed commit (our generated data).
+          git push origin main || \
+            (git pull --rebase -X theirs origin/main && git push origin main)
