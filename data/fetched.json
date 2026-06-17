@@ -1,0 +1,9 @@
+{
+  "fetch_date": "2026-06-16",
+  "vix": 16.40999984741211,
+  "strike": 20,
+  "option_bid": 4.0,
+  "option_ask": 4.2,
+  "sigma": 1.146,
+  "expiry_used": "2026-12-16"
+}
