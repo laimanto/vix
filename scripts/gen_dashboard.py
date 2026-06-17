@@ -170,9 +170,17 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
     days_remaining = MAX_HOLD - days_held
     entry_dt      = datetime.strptime(entry_date, '%Y-%m-%d')
     hard_deadline = (entry_dt + timedelta(days=MAX_HOLD)).strftime('%Y-%m-%d')
-    option_expiry = (entry_dt + timedelta(days=TENOR)).strftime('%Y-%m-%d')
     today_dt      = datetime.strptime(today_str, '%Y-%m-%d')
-    days_to_expiry = max(0, (entry_dt + timedelta(days=TENOR) - today_dt).days)
+    # Use actual expiry from position.json, then fetched.json, then estimate entry+180d
+    _exp_pos   = position.get('expiry', '')
+    _exp_fetch = fetched.get('expiry_used', '') if fetched else ''
+    if _exp_pos and _exp_pos != 'estimated':
+        option_expiry = _exp_pos
+    elif _exp_fetch and _exp_fetch != 'estimated':
+        option_expiry = _exp_fetch
+    else:
+        option_expiry = (entry_dt + timedelta(days=TENOR)).strftime('%Y-%m-%d')
+    days_to_expiry = max(0, (datetime.strptime(option_expiry, '%Y-%m-%d') - today_dt).days)
     rem_T         = max(0, (TENOR - days_held) / 365)
     theta         = theta_pct(curr_vix, strike, rem_T, curr_sigma)
     vix_change    = round(curr_vix - entry_vix, 2)

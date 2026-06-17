@@ -78,6 +78,7 @@ def auto_manage_trade(fetched, signal_info, position):
             'tenor':        TENOR,
             'max_hold':     MAX_HOLD,
             'peak_vix':     round(vix, 2),
+            'expiry':       fetched.get('expiry_used', ''),  # actual option expiry from yfinance
         }
         (DATA_DIR / 'position.json').write_text(json.dumps(new_pos, indent=2))
 
