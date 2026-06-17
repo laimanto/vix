@@ -553,8 +553,11 @@ def append_option_price_log(fetched, position):
     opt_bid   = float(fetched.get('option_bid', 0))
     opt_ask   = float(fetched.get('option_ask', 0))
     iv        = float(fetched.get('sigma', 0))
-    source    = 'yfinance'
-    note      = ''
+    expiry_used = fetched.get('expiry_used', '')
+    source    = 'yfinance' if expiry_used and expiry_used != 'estimated' else 'bs_estimate'
+    note      = '' if source == 'yfinance' else 'WARNING: yfinance option fetch failed; BS estimate used'
+    if source != 'yfinance':
+        print(f'  [option_price] WARNING: yfinance option fetch failed — BS estimate recorded for {today_str}')
 
     header = ['date', 'vix', 'strike', 'expiry', 'option_bid', 'option_ask', 'iv', 'source', 'note']
     if not log_path.exists():
