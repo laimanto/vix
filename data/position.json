@@ -1,12 +1,12 @@
 {
-  "in_position": true,
-  "trade_id": 13,
-  "entry_date": "2026-05-14",
-  "entry_vix": 16.57,
-  "entry_ask": 4.93,
-  "entry_sigma": 1.2964,
-  "strike": 20,
+  "in_position": false,
+  "trade_id": null,
+  "entry_date": null,
+  "entry_vix": null,
+  "entry_ask": null,
+  "entry_sigma": null,
+  "strike": null,
   "tenor": 180,
   "max_hold": 91,
-  "peak_vix": 18.79
+  "peak_vix": null
 }

@@ -4,7 +4,7 @@ on:
   schedule:
     # 21:00 UTC = ~17:00 EDT (summer) / ~16:00 EST (winter)
     # yfinance EOD data is fully settled by this time.
-    - cron: '0 21 * * 1-5'   # weekdays only (Mon–Fri)
+    - cron: '35 20 * * 1-5'   # 4:35pm EDT (20:35 UTC), weekdays only (Mon–Fri)
   workflow_dispatch:           # allow manual trigger from GitHub UI
 
 permissions:

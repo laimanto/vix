@@ -16,10 +16,11 @@ DASH_DIR  = BASE_DIR / 'dashboard'
 TMPL_PATH = DASH_DIR / 'index_base.html'
 OUT_PATH  = DASH_DIR / 'index.html'
 
-R      = 0.045
-SIGMA0 = 1.2964   # training-time IV used in BS model
-TENOR  = 180
-MAX_HOLD = 91
+R            = 0.045
+SIGMA0       = 1.2964   # training-time IV used in BS model
+TENOR        = 180
+MAX_HOLD     = 91
+INCEPTION    = '2026-06-17'   # date system went live
 
 
 # ── Black-Scholes helpers ──────────────────────────────────────────────────────
@@ -80,6 +81,13 @@ def load_signal():
     return {'signal': 'HOLD', 'exit_prob': None}
 
 
+def load_fetched():
+    p = DATA_DIR / 'fetched.json'
+    if p.exists():
+        return json.loads(p.read_text())
+    return {}
+
+
 # ── Computed summary stats ────────────────────────────────────────────────────
 
 def compute_perf(trades):
@@ -129,15 +137,16 @@ def gen_banner(is_mock=False):
 def gen_header_meta(today_str):
     return f'''  <div class="header-right">
     <div>Last updated: <strong>{today_str} EOD</strong></div>
-    <div>OOS period: <strong>2019-01-01 → present</strong></div>
+    <div>OOS period: <strong>2019-01-01 &rarr; present</strong></div>
     <div>Training cutoff: <strong>2018-12-31</strong></div>
+    <div>System live: <strong>{INCEPTION}</strong></div>
   </div>'''
 
 
-def gen_status(position, daily_log, signal_info, today_str):
+def gen_status(position, daily_log, signal_info, today_str, fetched=None):
     """Generate the full status section: cards + alert + position detail groups."""
     if not position.get('in_position'):
-        return _gen_status_out(signal_info, today_str)
+        return _gen_status_out(signal_info, today_str, fetched)
 
     entry_vix   = float(position['entry_vix'])
     entry_ask   = float(position['entry_ask'])
@@ -161,6 +170,9 @@ def gen_status(position, daily_log, signal_info, today_str):
     days_remaining = MAX_HOLD - days_held
     entry_dt      = datetime.strptime(entry_date, '%Y-%m-%d')
     hard_deadline = (entry_dt + timedelta(days=MAX_HOLD)).strftime('%Y-%m-%d')
+    option_expiry = (entry_dt + timedelta(days=TENOR)).strftime('%Y-%m-%d')
+    today_dt      = datetime.strptime(today_str, '%Y-%m-%d')
+    days_to_expiry = max(0, (entry_dt + timedelta(days=TENOR) - today_dt).days)
     rem_T         = max(0, (TENOR - days_held) / 365)
     theta         = theta_pct(curr_vix, strike, rem_T, curr_sigma)
     vix_change    = round(curr_vix - entry_vix, 2)
@@ -258,13 +270,15 @@ def gen_status(position, daily_log, signal_info, today_str):
   <!-- GROUP 2: OPTION PRICES -->
   <div class="pos-group">
     <h3>Option Prices</h3>
+    <div class="pos-row"><span class="k">Contract</span><span class="v">VIX {strike} Call</span></div>
+    <div class="pos-row"><span class="k">Option Expiry</span><span class="v">{option_expiry}</span></div>
+    <div class="pos-row"><span class="k">Days to Expiry</span><span class="v orange">{days_to_expiry}</span></div>
     <div class="pos-row"><span class="k">Entry Ask (paid)</span><span class="v">${entry_ask:.2f}</span></div>
     <div class="pos-row"><span class="k">Current Bid (sell at)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">${curr_bid:.2f}</span></div>
-    <div class="pos-row"><span class="k">Current Ask (buy at)</span><span class="v">${curr_ask_p:.2f}</span></div>
-    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">${spread_dollar:.2f}</span></div>
-    <div class="pos-row"><span class="k">Spread %</span><span class="v orange">{spread_pct:.1f}%</span></div>
+    <div class="pos-row"><span class="k">Current Ask</span><span class="v">${curr_ask_p:.2f}</span></div>
+    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">${spread_dollar:.2f} ({spread_pct:.1f}%)</span></div>
     <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">{roi_str}</span></div>
-    <div class="pos-row"><span class="k">Theta</span><span class="v red" id="thetaDisp">{theta_sign}{theta:.2f}%/day</span></div>
+    <div class="pos-row"><span class="k">Theta</span><span class="v red">{theta_sign}{theta:.2f}%/day</span></div>
   </div>
 
   <!-- GROUP 3: TIME & DATES -->
@@ -281,15 +295,32 @@ def gen_status(position, daily_log, signal_info, today_str):
 </div>'''
 
 
-def _gen_status_out(signal_info, today_str):
+def _gen_status_out(signal_info, today_str, fetched=None):
     """Status section when not in position."""
     signal = signal_info.get('signal', 'HOLD')
     signal_class = 'c-buy' if signal == 'BUY' else 'c-hold'
     signal_color = 'green' if signal == 'BUY' else 'orange'
     alert_class  = 'alert-warn' if signal == 'BUY' else 'alert-ok'
-    alert_txt    = ('⚠ BUY SIGNAL — Agent recommends entering today. Check VIX option ask price.'
-                    if signal == 'BUY' else
-                    '✓ Waiting for entry signal — no position open.')
+
+    # Today's market data from fetched.json (if available)
+    curr_vix  = float(fetched.get('vix', 0)) if fetched else 0
+    curr_ask  = float(fetched.get('option_ask', 0)) if fetched else 0
+    curr_bid  = float(fetched.get('option_bid', 0)) if fetched else 0
+    hyp_strike = int(fetched.get('strike', 0)) if fetched else 0
+    sigma     = float(fetched.get('sigma', SIGMA0)) if fetched else SIGMA0
+
+    if signal == 'BUY':
+        alert_txt = (f'BUY SIGNAL — Agent recommends entering today. '
+                     f'Hypothetical entry: VIX {curr_vix:.2f}, ask ${curr_ask:.2f}, '
+                     f'strike {hyp_strike}.')
+    else:
+        vix_str = f' VIX: {curr_vix:.2f}.' if curr_vix > 0 else ''
+        alert_txt = f'Waiting for entry signal — no position open.{vix_str}'
+
+    vix_card  = f'{curr_vix:.2f}' if curr_vix > 0 else '—'
+    ask_card  = f'${curr_ask:.2f}' if curr_ask > 0 else '—'
+    ask_hint  = f'Strike {hyp_strike} Call (hypothetical)' if hyp_strike > 0 else 'No position'
+
     return f'''<!-- STATUS CARDS -->
 <div class="sec">Today's Status ({today_str})</div>
 <div class="status-row">
@@ -304,20 +335,20 @@ def _gen_status_out(signal_info, today_str):
     <div class="hint">—</div>
   </div>
   <div class="card">
-    <div class="lbl">Current ROI</div>
-    <div class="val gray">—</div>
-    <div class="hint">No open position</div>
+    <div class="lbl">VIX Today</div>
+    <div class="val white">{vix_card}</div>
+    <div class="hint">EOD close</div>
   </div>
   <div class="card">
-    <div class="lbl">Stop-Loss Risk</div>
-    <div class="val gray">—</div>
-    <div class="hint">—</div>
+    <div class="lbl">Option Ask (entry cost)</div>
+    <div class="val white">{ask_card}</div>
+    <div class="hint">{ask_hint}</div>
   </div>
 </div>
 <div class="alert {alert_class}">{alert_txt}</div>
 <!-- POSITION DETAIL -->
 <div class="sec">Current Position Detail</div>
-<div style="color:#8b949e;padding:20px;text-align:center;">No open position.</div>'''
+<div style="color:#8b949e;padding:20px;text-align:center;">No open position. Use the Option Calculator below to model potential entries.</div>'''
 
 
 def gen_perf(perf):
@@ -332,10 +363,16 @@ def gen_perf(perf):
 </div>'''
 
 
-def gen_jsdata(position, daily_log):
+def gen_jsdata(position, daily_log, fetched=None):
     """Generate the JS constants + histVIX data block."""
     if not position.get('in_position') or not daily_log:
-        return f'const SIGMA0={SIGMA0}, R={R}, TENOR={TENOR}, STRIKE=0;\nconst ENTRY_ASK=0;\nconst ENTRY_DATE=new Date();\nconst DAYS_HELD=0;\nconst CURR_VIX=18, CURR_SIGMA={SIGMA0};\nconst histVIX=[];'
+        curr_vix   = float(fetched['vix'])   if fetched and fetched.get('vix')   else 18.0
+        curr_sigma = float(fetched['sigma']) if fetched and fetched.get('sigma') else SIGMA0
+        return (f'const SIGMA0={SIGMA0}, R={R}, TENOR={TENOR}, STRIKE=0;\n'
+                f'const ENTRY_ASK=0;\nconst ENTRY_VIX=0;\n'
+                f'const ENTRY_DATE=new Date();\nconst DAYS_HELD=0;\n'
+                f'const CURR_VIX={curr_vix}, CURR_SIGMA={curr_sigma};\n'
+                f'const histVIX=[];')
 
     entry_ask   = float(position['entry_ask'])
     entry_sigma = float(position.get('entry_sigma', SIGMA0))
@@ -352,9 +389,11 @@ def gen_jsdata(position, daily_log):
         vix_lines.append('  ' + ', '.join(str(v) for v in hist_vix[i:i+n_per_line]))
     vix_block = '\n'.join(vix_lines)
 
+    entry_vix = float(position['entry_vix'])
     return f'''// ── Constants ──────────────────────────────────────────────────────────────────
 const SIGMA0={entry_sigma}, R={R}, TENOR={TENOR}, STRIKE={strike};
 const ENTRY_ASK={entry_ask};   // ask price paid at entry
+const ENTRY_VIX={entry_vix};  // VIX at entry
 const ENTRY_DATE=new Date('{entry_date}');
 const DAYS_HELD={days_held};
 const CURR_VIX={curr_vix}, CURR_SIGMA={curr_sigma};
@@ -440,10 +479,11 @@ def main(is_mock=False):
     today_str = date.today().strftime('%Y-%m-%d')
     print(f'gen_dashboard.py  today={today_str}  mock={is_mock}')
 
-    trades    = load_trades()
-    daily_log = load_daily_log()
-    position  = load_position()
+    trades      = load_trades()
+    daily_log   = load_daily_log()
+    position    = load_position()
     signal_info = load_signal()
+    fetched     = load_fetched()
 
     perf = compute_perf(trades)
 
@@ -455,9 +495,9 @@ def main(is_mock=False):
     # Replace sentinels
     html = replace_sentinel(html, 'BANNER',      gen_banner(is_mock))
     html = replace_sentinel(html, 'HEADER_META', gen_header_meta(today_str))
-    html = replace_sentinel(html, 'STATUS',      gen_status(position, daily_log, signal_info, today_str))
+    html = replace_sentinel(html, 'STATUS',      gen_status(position, daily_log, signal_info, today_str, fetched))
     html = replace_sentinel(html, 'PERF',        gen_perf(perf))
-    html = replace_sentinel(html, 'JSDATA',      gen_jsdata(position, daily_log))
+    html = replace_sentinel(html, 'JSDATA',      gen_jsdata(position, daily_log, fetched))
     html = replace_sentinel(html, 'TRADES',      gen_trades_js(trades))
 
     OUT_PATH.write_text(html, encoding='utf-8')

@@ -197,8 +197,23 @@ tr:hover td { background: #1c2128; }
 <div class="calc-box">
   <div class="calc-grid">
     <div class="calc-inputs">
+      <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px 12px;margin-bottom:4px;">
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Your Entry (actual trade)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:3px;">Entry VIX</label>
+            <input type="number" id="calcEntryVix" step="0.1" min="10" max="50" placeholder="e.g. 18.5"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #58a6ff;border-radius:4px;color:#e6edf3;padding:5px 8px;font-size:13px;" oninput="updateCalc()">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#8b949e;display:block;margin-bottom:3px;">Entry Ask paid ($)</label>
+            <input type="number" id="calcEntryAsk" step="0.01" min="0" placeholder="e.g. 4.93"
+              style="width:100%;box-sizing:border-box;background:#161b22;border:1px solid #58a6ff;border-radius:4px;color:#e6edf3;padding:5px 8px;font-size:13px;" oninput="updateCalc()">
+          </div>
+        </div>
+      </div>
       <div class="slider-group">
-        <label>VIX Level <span id="calcVixVal">18.50</span></label>
+        <label>Current VIX <span id="calcVixVal">18.50</span></label>
         <input type="range" id="calcVix" min="10" max="50" step="0.5" value="18.5" oninput="updateCalc()">
       </div>
       <div class="slider-group">
@@ -206,14 +221,13 @@ tr:hover td { background: #1c2128; }
         <input type="range" id="calcIV" min="50" max="300" step="1" value="127" oninput="updateCalc()">
       </div>
       <div class="slider-group">
-        <label>Days Held <span id="calcDaysVal">33</span></label>
-        <input type="range" id="calcDays" min="0" max="91" step="1" value="33" oninput="updateCalc()">
+        <label>Days Held <span id="calcDaysVal">0</span></label>
+        <input type="range" id="calcDays" min="0" max="91" step="1" value="0" oninput="updateCalc()">
       </div>
       <div style="font-size:12px;color:#8b949e;line-height:1.7;margin-top:4px;">
-        <b style="color:#c9d1d9;">Pricing:</b> Live bid/ask fetched from yfinance (EOD)<br>
-        Buy at ask &nbsp;|&nbsp; Sell at bid &nbsp;|&nbsp; Spread = ask − bid<br>
-        Entry cost = ask paid at open = <b style="color:#e6edf3;">$4.93</b><br>
-        <span style="color:#e3b341;">Note: calculator uses ±3% spread estimate (live data in production)</span>
+        <b style="color:#c9d1d9;">Pricing:</b> Buy at ask &nbsp;|&nbsp; Sell at bid<br>
+        Fill in <b style="color:#c9d1d9;">Entry VIX</b> + <b style="color:#c9d1d9;">Entry Ask</b> to compute your real trade ROI.<br>
+        <span style="color:#e3b341;">Spread model: ±3% estimate (live bid/ask in production)</span>
       </div>
     </div>
     <div class="calc-output">
@@ -408,13 +422,21 @@ function updateCalc(){
   document.getElementById('calcIVVal').textContent=Math.round(sigma*100)+'%';
   document.getElementById('calcDaysVal').textContent=d;
 
+  // Entry parameters: read from inputs, fall back to JS constants
+  const rawEAsk=parseFloat(document.getElementById('calcEntryAsk').value);
+  const rawEVix=parseFloat(document.getElementById('calcEntryVix').value);
+  const eAsk=(!isNaN(rawEAsk)&&rawEAsk>0)?rawEAsk:(ENTRY_ASK>0?ENTRY_ASK:0);
+  const eVix=(!isNaN(rawEVix)&&rawEVix>0)?rawEVix:(ENTRY_VIX>0?ENTRY_VIX:0);
+  // Strike derived from entry VIX; fall back to position STRIKE or current VIX
+  const eff_strike=eVix>0?Math.ceil(eVix*1.2):(STRIKE>0?STRIKE:Math.ceil(S*1.2));
+
   const T=Math.max(0,(TENOR-d)/365);
-  const m=bsCall(S,STRIKE,T,sigma,R);
+  const m=bsCall(S,eff_strike,T,sigma,R);
   const b=bid(m), a=ask_(m);
   const sp=a-b, spPct=sp/m*100;
-  const th=theta_pct(S,STRIKE,T,sigma,R,m);
-  const roiBid=(b-ENTRY_ASK)/ENTRY_ASK*100;
+  const th=theta_pct(S,eff_strike,T,sigma,R,m);
   const dLeft=Math.max(0,91-d);
+  const roiBid=eAsk>0?(b-eAsk)/eAsk*100:null;
 
   document.getElementById('cBid').textContent='$'+b.toFixed(2);
   document.getElementById('cAsk').textContent='$'+a.toFixed(2);
@@ -422,80 +444,80 @@ function updateCalc(){
   document.getElementById('cSpreadPct').textContent=spPct.toFixed(1)+'%';
   document.getElementById('cDaysLeft').textContent=dLeft+' days';
   document.getElementById('cTheta').textContent=th.toFixed(2)+'%/day';
-  document.getElementById('cROIBid').innerHTML=fmtROI(roiBid);
+  document.getElementById('cROIBid').innerHTML=roiBid!==null
+    ?fmtROI(roiBid)
+    :'<span style="color:#8b949e;font-size:16px;">Enter ask above</span>';
 
-  // ── Chart 1: VIX Sensitivity (price vs VIX at selected days+IV) ──────────────
+  // ── Chart 1: VIX Sensitivity ──────────────────────────────────────────────────
   const vixRange=[], vBid=[], vAsk=[], vROIbid=[];
-  const T_fixed=Math.max(0,(TENOR-d)/365);
   for(let v=10;v<=45;v+=0.5){
     vixRange.push(+v.toFixed(1));
-    const mm=bsCall(v,STRIKE,T_fixed,sigma,R);
+    const mm=bsCall(v,eff_strike,Math.max(0,(TENOR-d)/365),sigma,R);
     const bb=bid(mm), aa=ask_(mm);
     vBid.push(+bb.toFixed(3)); vAsk.push(+aa.toFixed(3));
-    vROIbid.push(+((bb-ENTRY_ASK)/ENTRY_ASK*100).toFixed(1));
+    vROIbid.push(eAsk>0?+((bb-eAsk)/eAsk*100).toFixed(1):0);
   }
-  Plotly.newPlot('calcVIXChart',[
-    {x:[10,45],y:[ENTRY_ASK,ENTRY_ASK],mode:'lines',name:'Entry ask',
-     line:{color:'#8b949e',width:1,dash:'dot'},hoverinfo:'skip',showlegend:false},
+  const traces1=[
     {x:vixRange,y:vAsk,mode:'lines',name:'Ask (buy)',line:{color:'#e3b341',width:1.5,dash:'dash'},
      hovertemplate:'VIX %{x}<br>Ask: $%{y:.2f}<extra>Ask</extra>'},
     {x:vixRange,y:vBid,mode:'lines',name:'Bid (sell)',line:{color:'#3fb950',width:2},
-     hovertemplate:'VIX %{x}<br>Bid: $%{y:.2f}<br>ROI: %{customdata}%<extra>Bid</extra>',
-     customdata:vROIbid},
-  ],{
-    paper_bgcolor:'#161b22',plot_bgcolor:'#0d1117',
-    font:{color:'#c9d1d9',size:11},
+     hovertemplate:'VIX %{x}<br>Bid: $%{y:.2f}<br>ROI: %{customdata}%<extra>Bid</extra>',customdata:vROIbid},
+  ];
+  if(eAsk>0) traces1.unshift({x:[10,45],y:[eAsk,eAsk],mode:'lines',name:'Entry ask',
+    line:{color:'#8b949e',width:1,dash:'dot'},hoverinfo:'skip',showlegend:false});
+  const shapes1=[{type:'line',xref:'x',yref:'paper',x0:S,x1:S,y0:0,y1:1,
+    line:{color:'#e3b341',width:1.5,dash:'dot'}}];
+  const ann1=[{xref:'x',yref:'paper',x:S,y:1.06,text:'Selected',showarrow:false,
+    font:{color:'#e3b341',size:9},xanchor:'center'}];
+  if(eVix>0){
+    shapes1.push({type:'line',xref:'x',yref:'paper',x0:eVix,x1:eVix,y0:0,y1:1,
+      line:{color:'#8b949e',width:1,dash:'dot'}});
+    ann1.push({xref:'x',yref:'paper',x:eVix,y:1.06,text:'Entry',showarrow:false,
+      font:{color:'#8b949e',size:9},xanchor:'center'});
+  }
+  Plotly.newPlot('calcVIXChart',traces1,{
+    paper_bgcolor:'#161b22',plot_bgcolor:'#0d1117',font:{color:'#c9d1d9',size:11},
     xaxis:{title:'VIX Level',gridcolor:'#21262d',tickfont:{size:10}},
     yaxis:{title:'Price ($)',gridcolor:'#21262d',tickprefix:'$'},
     legend:{orientation:'h',y:-0.32,font:{size:10}},
-    margin:{t:10,r:15,b:65,l:55},
-    hovermode:'x unified',
-    shapes:[
-      {type:'line',xref:'x',yref:'paper',x0:S,x1:S,y0:0,y1:1,
-       line:{color:'#e3b341',width:1.5,dash:'dot'}},
-      {type:'line',xref:'x',yref:'paper',x0:16.57,x1:16.57,y0:0,y1:1,
-       line:{color:'#8b949e',width:1,dash:'dot'}}
-    ],
-    annotations:[
-      {xref:'x',yref:'paper',x:S,y:1.06,text:'Selected',showarrow:false,
-       font:{color:'#e3b341',size:9},xanchor:'center'},
-      {xref:'x',yref:'paper',x:16.57,y:1.06,text:'Entry',showarrow:false,
-       font:{color:'#8b949e',size:9},xanchor:'center'}
-    ]
+    margin:{t:10,r:15,b:65,l:55},hovermode:'x unified',
+    shapes:shapes1,annotations:ann1
   },{responsive:true});
 
-  // ── Chart 2: Time Decay (price vs days at selected VIX+IV) ───────────────────
+  // ── Chart 2: Time Decay ───────────────────────────────────────────────────────
   const cx=[],cbid_=[],cask_=[],croi_bid=[];
   for(let dd=d;dd<=91;dd++){
     cx.push(dd);
-    const Td=Math.max(0,(TENOR-dd)/365);
-    const mm=bsCall(S,STRIKE,Td,sigma,R);
+    const mm=bsCall(S,eff_strike,Math.max(0,(TENOR-dd)/365),sigma,R);
     const bb=bid(mm), aa=ask_(mm);
     cbid_.push(+bb.toFixed(3)); cask_.push(+aa.toFixed(3));
-    croi_bid.push(+((bb-ENTRY_ASK)/ENTRY_ASK*100).toFixed(1));
+    croi_bid.push(eAsk>0?+((bb-eAsk)/eAsk*100).toFixed(1):0);
   }
-  Plotly.newPlot('calcDecayChart',[
-    {x:[d,91],y:[ENTRY_ASK,ENTRY_ASK],mode:'lines',name:'Entry ask',
-     line:{color:'#8b949e',width:1,dash:'dot'},hoverinfo:'skip',showlegend:false},
+  const traces2=[
     {x:cx,y:cask_,mode:'lines',name:'Ask (buy)',line:{color:'#e3b341',width:1.5,dash:'dash'},
      hovertemplate:'Day %{x}<br>Ask: $%{y:.2f}<extra>Ask</extra>'},
     {x:cx,y:cbid_,mode:'lines',name:'Bid (sell)',line:{color:'#3fb950',width:2},
-     hovertemplate:'Day %{x}<br>Bid: $%{y:.2f}<br>ROI: %{customdata}%<extra>Bid</extra>',
-     customdata:croi_bid},
-  ],{
-    paper_bgcolor:'#161b22',plot_bgcolor:'#0d1117',
-    font:{color:'#c9d1d9',size:11},
+     hovertemplate:'Day %{x}<br>Bid: $%{y:.2f}<br>ROI: %{customdata}%<extra>Bid</extra>',customdata:croi_bid},
+  ];
+  if(eAsk>0) traces2.unshift({x:[d,91],y:[eAsk,eAsk],mode:'lines',name:'Entry ask',
+    line:{color:'#8b949e',width:1,dash:'dot'},hoverinfo:'skip',showlegend:false});
+  Plotly.newPlot('calcDecayChart',traces2,{
+    paper_bgcolor:'#161b22',plot_bgcolor:'#0d1117',font:{color:'#c9d1d9',size:11},
     xaxis:{title:'Days Held',gridcolor:'#21262d',tickfont:{size:10}},
     yaxis:{title:'Price ($)',gridcolor:'#21262d',tickprefix:'$'},
     legend:{orientation:'h',y:-0.32,font:{size:10}},
-    margin:{t:10,r:15,b:65,l:55},
-    hovermode:'x unified',
+    margin:{t:10,r:15,b:65,l:55},hovermode:'x unified',
     shapes:[{type:'line',x0:d,x1:d,y0:0,y1:1,xref:'x',yref:'paper',
              line:{color:'#58a6ff',width:1.5,dash:'dot'}}],
     annotations:[{xref:'x',yref:'paper',x:d,y:1.06,text:'Today',showarrow:false,
                   font:{color:'#58a6ff',size:9},xanchor:'center'}]
   },{responsive:true});
 }
+// Pre-populate entry inputs from position data (if in position)
+if(ENTRY_ASK>0) document.getElementById('calcEntryAsk').value=ENTRY_ASK.toFixed(2);
+if(ENTRY_VIX>0) document.getElementById('calcEntryVix').value=ENTRY_VIX.toFixed(1);
+if(DAYS_HELD>0) document.getElementById('calcDays').value=DAYS_HELD;
+if(CURR_VIX>0)  document.getElementById('calcVix').value=CURR_VIX.toFixed(1);
 updateCalc(); // init
 
 // ── Trade Data (reverse date order) ───────────────────────────────────────────

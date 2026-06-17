@@ -3,7 +3,7 @@ fetch_data.py  —  Fetch end-of-day VIX price and option bid/ask from yfinance.
 Returns a dict written to data/fetched.json for use by run_agent.py and gen_dashboard.py.
 """
 
-import json, math, sys
+import json, math, sys, csv as _csv
 from pathlib import Path
 from datetime import date, datetime
 
@@ -104,37 +104,44 @@ def main():
         'vix': vix,
     }
 
+    # Always fetch option data — use actual position strike if in position,
+    # otherwise compute hypothetical entry strike from today's VIX.
     if position.get('in_position'):
-        strike      = int(position['strike'])
-        entry_date  = position['entry_date']
-        entry_ask   = float(position['entry_ask'])
+        strike     = int(position['strike'])
+        entry_date = position['entry_date']
+    else:
+        strike     = math.ceil(vix * 1.2)   # hypothetical entry today
+        entry_date = fetch_date
 
-        print(f'Fetching option chain  strike={strike}  entry={entry_date}...')
-        try:
-            bid, ask, iv, expiry = fetch_option(strike, entry_date)
-            sigma = estimate_sigma_from_iv(iv)
-            print(f'  Expiry: {expiry}  Bid: {bid}  Ask: {ask}  IV: {sigma:.4f}')
-        except Exception as e:
-            print(f'  Option fetch failed: {e}  — using BS estimate')
-            # Fall back to BS model with last-known sigma
-            daily_log = list(__import__('csv').DictReader(open(DATA_DIR / 'daily_log.csv')))
-            sigma = float(daily_log[-1]['sigma']) if daily_log else float(position['entry_sigma'])
+    print(f'Fetching option chain  strike={strike}  entry={entry_date}...')
+    try:
+        bid, ask, iv, expiry = fetch_option(strike, entry_date)
+        sigma = estimate_sigma_from_iv(iv)
+        print(f'  Expiry: {expiry}  Bid: {bid}  Ask: {ask}  IV: {sigma:.4f}')
+    except Exception as e:
+        print(f'  Option fetch failed: {e}  — using BS estimate')
+        daily_log = list(__import__('csv').DictReader(open(DATA_DIR / 'daily_log.csv')))
+        last_sigma = float(daily_log[-1]['sigma']) if daily_log else float(position.get('entry_sigma', 1.2964))
+        sigma = last_sigma
+        if position.get('in_position'):
             entry_date_dt = datetime.strptime(entry_date, '%Y-%m-%d').date()
             days_held_so_far = (datetime.strptime(fetch_date, '%Y-%m-%d').date() - entry_date_dt).days
             T = max(0, (TENOR - days_held_so_far) / 365)
-            mid = bs_call(vix, strike, T, sigma)
-            sp  = max(0.10, mid * 0.06)
-            bid = round(mid - sp / 2, 2)
-            ask = round(mid + sp / 2, 2)
-            expiry = 'estimated'
+        else:
+            T = TENOR / 365
+        mid = bs_call(vix, strike, T, sigma)
+        sp  = max(0.10, mid * 0.06)
+        bid = round(mid - sp / 2, 2)
+        ask = round(mid + sp / 2, 2)
+        expiry = 'estimated'
 
-        result.update({
-            'strike':  strike,
-            'option_bid': bid,
-            'option_ask': ask,
-            'sigma': sigma,
-            'expiry_used': expiry,
-        })
+    result.update({
+        'strike':     strike,
+        'option_bid': bid,
+        'option_ask': ask,
+        'sigma':      sigma,
+        'expiry_used': expiry,
+    })
 
     out_path = DATA_DIR / 'fetched.json'
     out_path.write_text(json.dumps(result, indent=2))
