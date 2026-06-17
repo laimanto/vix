@@ -48,4 +48,5 @@ jobs:
                   dashboard/index.html
           git diff --staged --quiet && echo "Nothing changed" || \
             git commit -m "Daily update $(date -u +'%Y-%m-%d')"
+          git pull --rebase
           git push
