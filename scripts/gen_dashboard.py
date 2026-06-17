@@ -197,6 +197,8 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades
     rem_T         = max(0, (TENOR - days_held) / 365)
     theta         = theta_pct(curr_vix, strike, rem_T, curr_sigma)
     delta         = delta_call(curr_vix, strike, rem_T, curr_sigma)
+    curr_mid      = (curr_bid + curr_ask_p) / 2
+    lam           = delta * (curr_vix / curr_mid) if curr_mid > 0 else 0.0
     vix_change    = round(curr_vix - entry_vix, 2)
     vix_change_pct = round(vix_change / entry_vix * 100, 1)
     sigma_change_pp = round((curr_sigma - entry_sigma) * 100, 1)
@@ -332,6 +334,7 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades
     <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">${spread_dollar:.2f} ({spread_pct:.1f}%)</span></div>
     <div class="pos-row"><span class="k">Current Implied Vol</span><span class="v orange">{curr_sigma*100:.1f}% <span class="badge badge-{sigma_badge_dir}">{sigma_sign}{sigma_change_pp:.1f}pp</span></span></div>
     <div class="pos-row"><span class="k">Delta</span><span class="v">{delta:.3f}</span></div>
+    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">{lam:.2f}&times;</span></div>
     <div class="pos-row"><span class="k">Theta</span><span class="v red">{theta_sign}{theta:.2f}%/day</span></div>
     <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v {'green' if roi_bid >= 0 else 'red'}">{roi_str}</span></div>
     <div class="pos-row"><span class="k">Days Held</span><span class="v">{day_num}</span></div>
