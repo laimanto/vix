@@ -5,10 +5,26 @@ Returns a dict written to data/fetched.json for use by run_agent.py and gen_dash
 
 import json, math, sys, csv as _csv
 from pathlib import Path
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 import yfinance as yf
 import numpy as np
+
+# 4:35pm EDT = 20:35 UTC.  Before this, today's market hasn't closed yet.
+_CLOSE_UTC_HOUR, _CLOSE_UTC_MIN = 20, 35
+
+
+def get_effective_trading_date():
+    """Return the date of the last completed 4:35pm EDT close.
+    If run before 4:35pm, returns yesterday (skipping weekends).
+    """
+    now_utc = datetime.now(timezone.utc)
+    closed = (now_utc.hour > _CLOSE_UTC_HOUR or
+              (now_utc.hour == _CLOSE_UTC_HOUR and now_utc.minute >= _CLOSE_UTC_MIN))
+    d = now_utc.date() if closed else now_utc.date() - timedelta(days=1)
+    while d.weekday() >= 5:   # skip Saturday / Sunday
+        d -= timedelta(days=1)
+    return d
 
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
@@ -28,14 +44,38 @@ def bs_call(S, K, T, sigma, r=R):
 
 
 def fetch_vix():
-    """Download latest VIX close."""
+    """Download the last completed EOD VIX close.
+    Before 4:35pm EDT the current day hasn't closed; use the previous close.
+    """
+    effective = get_effective_trading_date()
     ticker = yf.Ticker('^VIX')
     hist = ticker.history(period='5d')
     if hist.empty:
         raise RuntimeError('VIX history empty from yfinance')
-    vix = float(hist['Close'].iloc[-1])
-    fetch_date = hist.index[-1].strftime('%Y-%m-%d')
+
+    # Filter to rows whose date <= effective (completed closes only)
+    row_dates = [ts.date() for ts in hist.index]
+    valid_rows = [i for i, d in enumerate(row_dates) if d <= effective]
+    idx = valid_rows[-1] if valid_rows else len(hist) - 1  # fallback to latest
+
+    vix = float(hist['Close'].iloc[idx])
+    fetch_date = hist.index[idx].strftime('%Y-%m-%d')
+    print(f'  Effective close date: {effective}  -> using {fetch_date}  VIX={vix:.2f}')
     return vix, fetch_date
+
+
+def fetch_spot_vix():
+    """Fetch current spot VIX — latest available price (intraday during market hours, EOD after close).
+    Unlike fetch_vix(), this is NOT filtered to the effective EOD date; it always returns the freshest price.
+    """
+    try:
+        ticker = yf.Ticker('^VIX')
+        hist = ticker.history(period='2d')
+        if not hist.empty:
+            return round(float(hist['Close'].iloc[-1]), 2)
+    except Exception as e:
+        print(f'  [spot_vix] fetch failed: {e}')
+    return None
 
 
 def fetch_option(strike: int, entry_date_str: str):
@@ -130,9 +170,8 @@ def main():
         else:
             T = TENOR / 365
         mid = bs_call(vix, strike, T, sigma)
-        sp  = max(0.10, mid * 0.06)
-        bid = round(mid - sp / 2, 2)
-        ask = round(mid + sp / 2, 2)
+        bid = round(mid - 0.10, 2)   # fixed $0.20 spread observed in VIX option market
+        ask = round(mid + 0.10, 2)
         expiry = 'estimated'
 
     result.update({
@@ -143,9 +182,15 @@ def main():
         'expiry_used': expiry,
     })
 
+    # Spot VIX: current intraday price (not EOD-filtered) — used for live ROI display
+    print('Fetching spot VIX (live)...')
+    spot_vix = fetch_spot_vix()
+    result['spot_vix'] = spot_vix if spot_vix is not None else vix
+    print(f'  Spot VIX: {result["spot_vix"]:.2f}  (EOD: {vix:.2f})')
+
     out_path = DATA_DIR / 'fetched.json'
     out_path.write_text(json.dumps(result, indent=2))
-    print(f'Saved → {out_path}')
+    print(f'Saved -> {out_path}')
     return result
 
 

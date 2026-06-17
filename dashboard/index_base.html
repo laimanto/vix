@@ -23,7 +23,7 @@ main { padding: 18px 24px; max-width: 1440px; margin: 0 auto; }
 .sec { font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.9px; margin: 18px 0 10px; padding-bottom: 5px; border-bottom: 1px solid #21262d; }
 
 /* STATUS CARDS */
-.status-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+.status-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 13px 15px; }
 .card .lbl { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 5px; }
 .card .val { font-size: 22px; font-weight: 700; }
@@ -42,7 +42,7 @@ main { padding: 18px 24px; max-width: 1440px; margin: 0 auto; }
 .alert-none { display: none; }
 
 /* POSITION DETAIL — 3 grouped columns */
-.pos-groups { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.pos-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pos-group { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
 .pos-group h3 { font-size: 11px; color: #58a6ff; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }
 .pos-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid #0d1117; }

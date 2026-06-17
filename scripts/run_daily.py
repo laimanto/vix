@@ -98,10 +98,12 @@ def auto_manage_trade(fetched, signal_info, position):
         days_held  = (datetime.strptime(today, '%Y-%m-%d') -
                       datetime.strptime(entry_date, '%Y-%m-%d')).days
 
-        # Grace period: never exit on the same calendar day as entry.
-        # The exit model's observation is meaningless at days_held=0.
-        if days_held == 0:
-            print(f'  [auto-trade] Entry-day grace period — SELL ignored (days_held=0)')
+        # Grace period: each trading day runs 4:35pm → next 4:35pm.
+        # Don't exit until at least one full trading day has elapsed since entry close.
+        entry_4pm = datetime.strptime(entry_date, '%Y-%m-%d').replace(hour=16, minute=35)
+        trading_days_held = max(0, int((datetime.now() - entry_4pm).total_seconds() / 86400))
+        if trading_days_held < 1:
+            print(f'  [auto-trade] Grace period — SELL ignored (Day 1 still in progress, {trading_days_held:.2f} trading days elapsed)')
             return position
         roi_bid    = round((bid_px - entry_ask) / entry_ask * 100, 1) if entry_ask > 0 else 0.0
 
@@ -175,15 +177,42 @@ def main():
     print(f'\nVIX Call Strategy — Daily Run  [{date.today()}]')
     print(f'BASE_DIR: {BASE_DIR}')
 
+    # Detect Day 1 lock: if an active trade's entry close (4:35pm) hasn't rolled to Day 2 yet,
+    # freeze fetch + agent so the dashboard always shows the entry-day VIX and BUY signal.
+    position_early = json.loads((DATA_DIR / 'position.json').read_text()) if (DATA_DIR / 'position.json').exists() else {}
+    in_day1 = False
+    if position_early.get('in_position'):
+        entry_date_early = position_early.get('entry_date', '')
+        if entry_date_early:
+            entry_4pm_early = datetime.strptime(entry_date_early, '%Y-%m-%d').replace(hour=16, minute=35)
+            secs_since_close = (datetime.now() - entry_4pm_early).total_seconds()
+            if 0 <= secs_since_close < 86400:  # less than 24h since entry close
+                in_day1 = True
+                print(f'\n[Day 1 lock] {secs_since_close/3600:.1f}h since entry close — skipping fetch/agent, using entry-day data')
+                # Still refresh spot VIX so dashboard shows live price and ROI
+                try:
+                    import yfinance as _yf
+                    _hist = _yf.Ticker('^VIX').history(period='2d')
+                    if not _hist.empty:
+                        _spot = round(float(_hist['Close'].iloc[-1]), 2)
+                        _fp = DATA_DIR / 'fetched.json'
+                        if _fp.exists():
+                            _fd = json.loads(_fp.read_text())
+                            _fd['spot_vix'] = _spot
+                            _fp.write_text(json.dumps(_fd, indent=2))
+                            print(f'  [Day 1 spot] spot_vix updated to {_spot}')
+                except Exception as _e:
+                    print(f'  [Day 1 spot] update skipped: {_e}')
+
     # Step 1: Fetch VIX + option data
-    if not args.skip_fetch:
+    if not args.skip_fetch and not in_day1:
         import fetch_data
         run_step('fetch_data', fetch_data.main)
     else:
-        print('\n[skip] fetch_data')
+        print('\n[skip] fetch_data' + (' (Day 1 lock)' if in_day1 else ''))
 
     # Step 2: Run agent
-    if not args.skip_agent:
+    if not args.skip_agent and not in_day1:
         try:
             import run_agent
             run_step('run_agent', run_agent.main)
@@ -193,7 +222,7 @@ def main():
             if not sig_path.exists():
                 sig_path.write_text(json.dumps({'signal': 'HOLD', 'exit_prob': None, 'note': 'model unavailable'}))
     else:
-        print('\n[skip] run_agent')
+        print('\n[skip] run_agent' + (' (Day 1 lock)' if in_day1 else ''))
 
     # Step 3: Auto-manage trade (open on BUY, close on SELL / hard deadline)
     fetched     = json.loads((DATA_DIR / 'fetched.json').read_text()) if (DATA_DIR / 'fetched.json').exists() else {}
@@ -207,8 +236,9 @@ def main():
     # Step 4: Reload position (may have been updated by auto_manage_trade) then generate dashboard
     position = json.loads((DATA_DIR / 'position.json').read_text())
     import gen_dashboard as gd
-    run_step('append_daily_log', lambda: gd.append_daily_log(fetched, signal_info, position))
-    run_step('gen_dashboard',    lambda: gd.main(is_mock=args.mock))
+    run_step('append_daily_log',      lambda: gd.append_daily_log(fetched, signal_info, position))
+    run_step('append_option_price_log', lambda: gd.append_option_price_log(fetched, position))
+    run_step('gen_dashboard',         lambda: gd.main(is_mock=args.mock))
 
     # Step 5: Copy to Google Drive (optional)
     if args.gdrive_path:

@@ -249,7 +249,7 @@ def main():
 
     out_path = DATA_DIR / 'signal.json'
     out_path.write_text(json.dumps(signal_out, indent=2))
-    print(f'Saved → {out_path}')
+    print(f'Saved -> {out_path}')
     return signal_out
 
 

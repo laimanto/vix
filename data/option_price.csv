@@ -1,0 +1,2 @@
+date,vix,strike,expiry,option_bid,option_ask,iv,source,note
+2026-06-16,16.41,20,2026-12-16,3.92,4.12,1.1016,bs_estimate,entry day - BS mid=4.015 +/-0.10 spread; actual yfinance price unavailable

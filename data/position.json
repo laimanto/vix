@@ -1,14 +1,14 @@
 {
-  "in_position": false,
+  "in_position": true,
   "trade_id": 1,
   "entry_date": "2026-06-16",
   "entry_vix": 16.41,
-  "entry_ask": 4.2,
-  "entry_sigma": 1.146,
+  "entry_ask": 4.12,
+  "entry_sigma": 1.1016,
   "strike": 20,
   "tenor": 180,
   "max_hold": 91,
   "peak_vix": 16.41,
-  "days_held": 0,
-  "expiry": "2026-12-16"
+  "expiry": "2026-12-16",
+  "days_held": 0
 }
