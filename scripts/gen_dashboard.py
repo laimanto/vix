@@ -143,10 +143,10 @@ def gen_header_meta(today_str):
   </div>'''
 
 
-def gen_status(position, daily_log, signal_info, today_str, fetched=None):
+def gen_status(position, daily_log, signal_info, today_str, fetched=None, trades=None):
     """Generate the full status section: cards + alert + position detail groups."""
     if not position.get('in_position'):
-        return _gen_status_out(signal_info, today_str, fetched)
+        return _gen_status_out(signal_info, today_str, fetched, trades)
 
     entry_vix   = float(position['entry_vix'])
     entry_ask   = float(position['entry_ask'])
@@ -191,9 +191,22 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
     exit_prob = signal_info.get('exit_prob', None)
     ep_str   = f'{int(exit_prob*100)}%' if exit_prob is not None else '—'
 
-    # Card styles
-    signal_class = {'HOLD': 'c-hold', 'SELL': 'c-sell', 'BUY': 'c-buy'}.get(signal, 'c-hold')
-    signal_color = {'HOLD': 'orange', 'SELL': 'red', 'BUY': 'green'}.get(signal, 'orange')
+    # 1-based day number for display (entry day = Day 1)
+    day_num = days_held + 1
+
+    # On the entry day (days_held==0) always show BUY — the exit model has no meaning yet
+    if days_held == 0:
+        signal_label = 'Signal'
+        display_signal = 'BUY'
+        signal_class = 'c-buy'
+        signal_color = 'green'
+        signal_hint_txt = 'Entered today — monitoring'
+    else:
+        signal_label = 'Exit Signal'
+        display_signal = signal
+        signal_class = {'HOLD': 'c-hold', 'SELL': 'c-sell', 'BUY': 'c-buy'}.get(signal, 'c-hold')
+        signal_color = {'HOLD': 'orange', 'SELL': 'red', 'BUY': 'green'}.get(signal, 'orange')
+        signal_hint_txt = f'Exit prob: {ep_str}'
 
     roi_color = 'green' if roi_bid >= 0 else 'red'
     roi_str   = f'+{roi_bid:.1f}%' if roi_bid >= 0 else f'{roi_bid:.1f}%'
@@ -201,30 +214,33 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
 
     if roi_bid >= 0:
         risk_level, risk_color = 'LOW', 'green'
-        risk_hint = f'ROI positive, day {days_held}'
+        risk_hint = f'ROI positive, day {day_num}'
     elif roi_bid >= -20 and days_held < 60:
         risk_level, risk_color = 'MEDIUM', 'orange'
         risk_hint = f'Negative ROI, {days_remaining}d remaining'
     else:
         risk_level, risk_color = 'HIGH', 'red'
-        risk_hint = f'Deep loss or late hold, day {days_held}'
+        risk_hint = f'Deep loss or late hold, day {day_num}'
 
     # Alert
-    if roi_bid >= 5 and signal == 'HOLD':
+    if days_held == 0:
         alert_class = 'alert-ok'
-        alert_txt   = f'✓ Position healthy — ROI {roi_str}, VIX {"up" if vix_change >= 0 else "down"} from entry, day {days_held}. No stop-loss concern.'
+        alert_txt   = f'✓ BUY executed today — position opened. Day 1 of {MAX_HOLD}. VIX {entry_vix:.2f}, ask ${entry_ask:.2f}.'
+    elif roi_bid >= 5 and signal == 'HOLD':
+        alert_class = 'alert-ok'
+        alert_txt   = f'✓ Position healthy — ROI {roi_str}, VIX {"up" if vix_change >= 0 else "down"} from entry, day {day_num}. No stop-loss concern.'
     elif signal == 'SELL':
         alert_class = 'alert-warn'
         alert_txt   = f'⚠ EXIT SIGNAL — Agent recommends selling today. Exit prob: {ep_str}. Bid: ${curr_bid:.2f}  ROI: {roi_str}'
     elif roi_bid < -20:
         alert_class = 'alert-warn'
-        alert_txt   = f'⚠ Deep loss ({roi_str}), day {days_held}. Consider manual review.'
+        alert_txt   = f'⚠ Deep loss ({roi_str}), day {day_num}. Consider manual review.'
     elif days_remaining <= 10:
         alert_class = 'alert-warn'
         alert_txt   = f'⚠ Hard deadline in {days_remaining} days ({hard_deadline}). Prepare to exit.'
     else:
         alert_class = 'alert-ok'
-        alert_txt   = f'✓ Position monitored — ROI {roi_str}, day {days_held}, {days_remaining}d remaining.'
+        alert_txt   = f'✓ Position monitored — ROI {roi_str}, day {day_num}, {days_remaining}d remaining.'
 
     vix_badge_dir   = 'up' if vix_change >= 0 else 'down'
     vix_badge_color = 'green' if vix_change >= 0 else 'red'
@@ -239,12 +255,12 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
   <div class="card c-in">
     <div class="lbl">Position</div>
     <div class="val green">IN</div>
-    <div class="hint">Day {days_held} of {MAX_HOLD} max</div>
+    <div class="hint">Day {day_num} of {MAX_HOLD} max</div>
   </div>
   <div class="card {signal_class}">
-    <div class="lbl">Exit Signal</div>
-    <div class="val {signal_color}">{signal}</div>
-    <div class="hint">Exit prob: {ep_str}</div>
+    <div class="lbl">{signal_label}</div>
+    <div class="val {signal_color}">{display_signal}</div>
+    <div class="hint">{signal_hint_txt}</div>
   </div>
   <div class="card">
     <div class="lbl">Current ROI</div>
@@ -294,7 +310,7 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
     <h3>Time &amp; Dates</h3>
     <div class="pos-row"><span class="k">Entry Date</span><span class="v">{entry_date}</span></div>
     <div class="pos-row"><span class="k">Today</span><span class="v">{today_str}</span></div>
-    <div class="pos-row"><span class="k">Days Held</span><span class="v">{days_held}</span></div>
+    <div class="pos-row"><span class="k">Days Held</span><span class="v">{day_num}</span></div>
     <div class="pos-row"><span class="k">Days Remaining</span><span class="v orange">{days_remaining}</span></div>
     <div class="pos-row"><span class="k">Tenor</span><span class="v gray">180 calendar days</span></div>
     <div class="pos-row"><span class="k">Hard Deadline</span><span class="v red">{hard_deadline}</span></div>
@@ -303,18 +319,61 @@ def gen_status(position, daily_log, signal_info, today_str, fetched=None):
 </div>'''
 
 
-def _gen_status_out(signal_info, today_str, fetched=None):
+def _gen_status_out(signal_info, today_str, fetched=None, trades=None):
     """Status section when not in position."""
     signal = signal_info.get('signal', 'HOLD')
-    signal_class = 'c-buy' if signal == 'BUY' else 'c-hold'
-    signal_color = 'green' if signal == 'BUY' else 'orange'
-    alert_class  = 'alert-warn' if signal == 'BUY' else 'alert-ok'
-    display_signal = signal if signal == 'BUY' else 'WAIT'
 
     # Today's market data from fetched.json (if available)
     curr_vix   = float(fetched.get('vix', 0))        if fetched else 0
     curr_ask   = float(fetched.get('option_ask', 0)) if fetched else 0
     hyp_strike = int(fetched.get('strike', 0))        if fetched else 0
+
+    vix_card = f'{curr_vix:.2f}' if curr_vix > 0 else '—'
+    ask_card = f'${curr_ask:.2f}' if curr_ask > 0 else '—'
+
+    # SELL: we just closed a trade today — show SELL until next pipeline run
+    if signal == 'SELL':
+        last_trade = next((t for t in reversed(trades or [])
+                           if t.get('exit_date') == today_str), None)
+        roi_str = ''
+        if last_trade:
+            roi_bid = float(last_trade.get('roi_bid', 0))
+            roi_str = f'  ROI: {"+"+f"{roi_bid:.1f}" if roi_bid >= 0 else f"{roi_bid:.1f}"}%.'
+        ask_hint = f'Strike {hyp_strike} Call' if hyp_strike > 0 else '—'
+        return f'''<!-- STATUS CARDS -->
+<div class="sec">Today's Status ({today_str})</div>
+<div class="status-row">
+  <div class="card">
+    <div class="lbl">Position</div>
+    <div class="val gray">OUT</div>
+    <div class="hint">Closed today</div>
+  </div>
+  <div class="card c-sell">
+    <div class="lbl">Action</div>
+    <div class="val red">SELL</div>
+    <div class="hint">Trade closed today</div>
+  </div>
+  <div class="card">
+    <div class="lbl">VIX Close</div>
+    <div class="val white">{vix_card}</div>
+    <div class="hint">EOD close</div>
+  </div>
+  <div class="card">
+    <div class="lbl">Option Ask</div>
+    <div class="val white">{ask_card}</div>
+    <div class="hint">{ask_hint}</div>
+  </div>
+</div>
+<div class="alert alert-ok">✓ SELL executed today — position closed.{roi_str}</div>
+<!-- POSITION DETAIL -->
+<div class="sec">Current Position Detail</div>
+<div style="color:#8b949e;padding:20px;text-align:center;">Position closed today. Use the Option Calculator below to model future entries.</div>'''
+
+    signal_class   = 'c-buy' if signal == 'BUY' else 'c-hold'
+    signal_color   = 'green' if signal == 'BUY' else 'orange'
+    alert_class    = 'alert-warn' if signal == 'BUY' else 'alert-ok'
+    display_signal = signal if signal == 'BUY' else 'WAIT'
+    ask_hint       = f'Strike {hyp_strike} Call (if entered today)' if hyp_strike > 0 else 'No position'
 
     if signal == 'BUY':
         alert_txt = (f'BUY SIGNAL — Agent recommends entering today. '
@@ -323,10 +382,6 @@ def _gen_status_out(signal_info, today_str, fetched=None):
     else:
         vix_str = f'  Current VIX: {curr_vix:.2f}.' if curr_vix > 0 else ''
         alert_txt = f'Waiting for entry signal — no position open.{vix_str}'
-
-    vix_card = f'{curr_vix:.2f}' if curr_vix > 0 else '—'
-    ask_card = f'${curr_ask:.2f}' if curr_ask > 0 else '—'
-    ask_hint = f'Strike {hyp_strike} Call (if entered today)' if hyp_strike > 0 else 'No position'
 
     return f'''<!-- STATUS CARDS -->
 <div class="sec">Today's Status ({today_str})</div>
@@ -516,7 +571,7 @@ def main(is_mock=False):
     # Replace sentinels
     html = replace_sentinel(html, 'BANNER',      gen_banner(is_mock))
     html = replace_sentinel(html, 'HEADER_META', gen_header_meta(today_str))
-    html = replace_sentinel(html, 'STATUS',      gen_status(position, daily_log, signal_info, today_str, fetched))
+    html = replace_sentinel(html, 'STATUS',      gen_status(position, daily_log, signal_info, today_str, fetched, trades))
     html = replace_sentinel(html, 'PERF',        gen_perf(perf))
     html = replace_sentinel(html, 'JSDATA',      gen_jsdata(position, daily_log, fetched))
     html = replace_sentinel(html, 'TRADES',      gen_trades_js(trades, daily_log))
