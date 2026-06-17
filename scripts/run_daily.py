@@ -97,6 +97,12 @@ def auto_manage_trade(fetched, signal_info, position):
         trade_id   = position.get('trade_id')
         days_held  = (datetime.strptime(today, '%Y-%m-%d') -
                       datetime.strptime(entry_date, '%Y-%m-%d')).days
+
+        # Grace period: never exit on the same calendar day as entry.
+        # The exit model's observation is meaningless at days_held=0.
+        if days_held == 0:
+            print(f'  [auto-trade] Entry-day grace period — SELL ignored (days_held=0)')
+            return position
         roi_bid    = round((bid_px - entry_ask) / entry_ask * 100, 1) if entry_ask > 0 else 0.0
 
         rows = list(csv.DictReader(open(trades_path, encoding='utf-8')))
@@ -121,7 +127,9 @@ def auto_manage_trade(fetched, signal_info, position):
         return new_pos
 
     elif in_pos and (datetime.strptime(today, '%Y-%m-%d') -
-                     datetime.strptime(position.get('entry_date', today), '%Y-%m-%d')).days >= MAX_HOLD:
+                     datetime.strptime(position.get('entry_date', today), '%Y-%m-%d')).days >= MAX_HOLD \
+                 and (datetime.strptime(today, '%Y-%m-%d') -
+                      datetime.strptime(position.get('entry_date', today), '%Y-%m-%d')).days > 0:
         # ── Hard deadline hit ────────────────────────────────────────────────────
         entry_ask  = float(position.get('entry_ask', 1))
         entry_date = position.get('entry_date', today)
