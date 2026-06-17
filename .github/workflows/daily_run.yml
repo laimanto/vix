@@ -1,0 +1,50 @@
+name: VIX Strategy Daily Run
+
+on:
+  schedule:
+    # 21:00 UTC = ~17:00 EDT (summer) / ~16:00 EST (winter)
+    # yfinance EOD data is fully settled by this time.
+    - cron: '0 21 * * 1-5'   # weekdays only (Mon–Fri)
+  workflow_dispatch:           # allow manual trigger from GitHub UI
+
+permissions:
+  contents: write              # needed to push updated CSVs + index.html back
+
+jobs:
+  daily-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r production_v1/requirements.txt
+
+      - name: Run daily pipeline
+        run: |
+          cd production_v1/scripts
+          python run_daily.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}/production_v1/scripts
+
+      - name: Commit updated data + dashboard
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add production_v1/data/daily_log.csv \
+                  production_v1/data/position.json  \
+                  production_v1/data/trades.csv      \
+                  production_v1/dashboard/index.html
+          git diff --staged --quiet && echo "Nothing changed" || \
+            git commit -m "Daily update $(date -u +'%Y-%m-%d')"
+          git push
