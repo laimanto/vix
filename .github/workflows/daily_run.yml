@@ -41,10 +41,10 @@ jobs:
         run: |
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add production_v1/data/daily_log.csv \
-                  production_v1/data/position.json  \
-                  production_v1/data/trades.csv      \
-                  production_v1/dashboard/index.html
+          git add data/daily_log.csv \
+                  data/position.json  \
+                  data/trades.csv      \
+                  dashboard/index.html
           git diff --staged --quiet && echo "Nothing changed" || \
             git commit -m "Daily update $(date -u +'%Y-%m-%d')"
           git push
