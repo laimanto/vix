@@ -1,2 +1,2 @@
 trade_id,entry_date,entry_vix,entry_ask,strike,exit_date,exit_vix,exit_bid,days_held,roi_bid,exit_reason,note
-1,2026-06-16,16.41,4.2,20,,,,0,,OPEN,auto
+1,2026-06-16,16.41,4.2,20,2026-06-17,16.84,4.05,1,-3.6,AE,auto
