@@ -28,14 +28,14 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -r production_v1/requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run daily pipeline
         run: |
-          cd production_v1/scripts
+          cd scripts
           python run_daily.py
         env:
-          PYTHONPATH: ${{ github.workspace }}/production_v1/scripts
+          PYTHONPATH: ${{ github.workspace }}/scripts
 
       - name: Commit updated data + dashboard
         run: |
