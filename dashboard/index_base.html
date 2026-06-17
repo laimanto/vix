@@ -227,7 +227,7 @@ tr:hover td { background: #1c2128; }
       <div style="font-size:12px;color:#8b949e;line-height:1.7;margin-top:4px;">
         <b style="color:#c9d1d9;">Pricing:</b> Buy at ask &nbsp;|&nbsp; Sell at bid<br>
         Fill in <b style="color:#c9d1d9;">Entry VIX</b> + <b style="color:#c9d1d9;">Entry Ask</b> to compute your real trade ROI.<br>
-        <span style="color:#e3b341;">Spread model: ±3% estimate (live bid/ask in production)</span>
+        <span style="color:#e3b341;">Spread model: fixed ±$0.10 (bid = mid − $0.10, ask = mid + $0.10)</span>
       </div>
     </div>
     <div class="calc-output">
@@ -317,9 +317,8 @@ function theta_pct(S,K,T,sigma,r,mid){
   const next=bsCall(S,K,T-1/365,sigma,r);
   return (next-mid)/mid*100;
 }
-function spread(mid){ return Math.max(0.10, mid*0.06); }
-function bid(mid){ return mid-spread(mid)/2; }
-function ask_(mid){ return mid+spread(mid)/2; }
+function bid(mid){ return mid-0.10; }
+function ask_(mid){ return mid+0.10; }
 function fmtROI(v){ const s=v>=0?'+':''; return `<span style="color:${v>=0?'#3fb950':'#f85149'}">${s}${v.toFixed(1)}%</span>`; }
 
 // %%JSDATA_START%%
