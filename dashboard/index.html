@@ -150,13 +150,13 @@ tr:hover td { background: #1c2128; }
   </div>
   <div class="card">
     <div class="lbl">Current VIX</div>
-    <div class="val green">18.44</div>
+    <div class="val green">17.09</div>
     <div class="hint">Spot (intraday)</div>
   </div>
   <div class="card">
     <div class="lbl">Current ROI</div>
-    <div class="val red">-2.9%</div>
-    <div class="hint">Ask $4.12 paid → Bid $4.00 now</div>
+    <div class="val red">-0.5%</div>
+    <div class="hint">Ask $4.12 paid → Bid $4.10 now</div>
   </div>
   <div class="card">
     <div class="lbl">Stop-Loss Risk</div>
@@ -165,7 +165,7 @@ tr:hover td { background: #1c2128; }
   </div>
 </div>
 
-<div class="alert alert-ok">✓ Position monitored — ROI -2.9%, day 2, 90d remaining.</div>
+<div class="alert alert-ok">✓ Position monitored — ROI -0.5%, day 2, 90d remaining.</div>
 
 <!-- POSITION DETAIL -->
 <div class="sec">Position Detail</div>
@@ -174,17 +174,17 @@ tr:hover td { background: #1c2128; }
   <div class="cmp-head">
     <span></span>
     <span>Entry &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">2026-06-16</span></span>
-    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of 02:10 UTC</span></span>
+    <span>Current &nbsp;<span style="font-weight:400;color:#8b949e;font-size:11px;">as of 15:40 UTC</span></span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">VIX</span>
     <span class="cmp-val">16.41</span>
-    <span class="cmp-val green">18.44 <span class="badge badge-up">+12.4%</span></span>
+    <span class="cmp-val green">17.09 <span class="badge badge-up">+4.1%</span></span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">Option Bid</span>
     <span class="cmp-val gray">$3.92 <span style="font-size:10px;color:#6e7681;">(est.)</span></span>
-    <span class="cmp-val red">$4.00</span>
+    <span class="cmp-val red">$4.10</span>
   </div>
   <div class="cmp-row">
     <span class="cmp-key">Option Ask</span>
@@ -218,13 +218,13 @@ tr:hover td { background: #1c2128; }
   <!-- METRICS & GREEKS -->
   <div class="pos-group">
     <h3>Metrics &amp; Greeks</h3>
-    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v red">-2.9%</span></div>
-    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.70 (16.1%)</span></div>
-    <div class="pos-row"><span class="k">Delta</span><span class="v">0.597</span></div>
-    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.53&times;</span></div>
-    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+$0.050</span></div>
-    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+1.15%</span></div>
-    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.32%/day</span></div>
+    <div class="pos-row"><span class="k">Current ROI (bid exit)</span><span class="v red">-0.5%</span></div>
+    <div class="pos-row"><span class="k">Bid/Ask Spread</span><span class="v">$0.60 (13.6%)</span></div>
+    <div class="pos-row"><span class="k">Delta</span><span class="v">0.553</span></div>
+    <div class="pos-row"><span class="k">Lambda (&#955;)</span><span class="v">2.15&times;</span></div>
+    <div class="pos-row"><span class="k">Vega ($/1pp IV)</span><span class="v green">+$0.047</span></div>
+    <div class="pos-row"><span class="k">Vega% (per 1pp IV)</span><span class="v green">+1.07%</span></div>
+    <div class="pos-row"><span class="k">Theta</span><span class="v red">-0.37%/day</span></div>
   </div>
 
 </div>
@@ -372,8 +372,8 @@ const ENTRY_ASK=4.12;   // ask price paid at entry
 const ENTRY_VIX=16.41;  // VIX at entry
 const ENTRY_DATE=new Date('2026-06-16');
 const DAYS_HELD=1;
-const CURR_VIX=18.44, CURR_SIGMA=0.9563;
-const CURR_BID=4.0, CURR_ASK=4.7;
+const CURR_VIX=17.09, CURR_SIGMA=0.9563;
+const CURR_BID=4.1, CURR_ASK=4.7;
 
 // ── Historical VIX path (days 0–0) ────────────────────────────────
 const histVIX=[
